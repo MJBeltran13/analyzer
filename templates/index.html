@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antenna Analyzer - Web Interface</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="title-section">
+                    <h1><i class="fas fa-satellite"></i> Antenna Analyzer</h1>
+                    <p class="subtitle">RF Testing Suite{% if mock_mode %} • Demo Mode{% endif %}</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="saveResults()">
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                    <button class="btn btn-secondary" onclick="showHistory()">
+                        <i class="fas fa-history"></i> History
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearResults()">
+                        <i class="fas fa-trash"></i> Clear
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Control Panel -->
+            <div class="control-panel">
+                <div class="card">
+                    <h3><i class="fas fa-cogs"></i> Test Parameters</h3>
+                    
+                    {% if mock_mode %}
+                    <div class="demo-badge">
+                        <i class="fas fa-desktop"></i> DEMO MODE
+                    </div>
+                    {% endif %}
+                    
+                    <div class="form-group">
+                        <label for="startFreq">Start Frequency (MHz)</label>
+                        <input type="number" id="startFreq" value="10.0" step="0.1" min="0.1" max="1000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="stopFreq">Stop Frequency (MHz)</label>
+                        <input type="number" id="stopFreq" value="20.0" step="0.1" min="0.1" max="1000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="points">Measurement Points</label>
+                        <input type="number" id="points" value="50" min="10" max="1000">
+                    </div>
+                    
+                    <div class="button-group">
+                        <button class="btn btn-primary btn-large" onclick="performSweep()" id="sweepBtn">
+                            <i class="fas fa-rocket"></i> START SWEEP
+                        </button>
+                        <button class="btn btn-success" onclick="quickTest()" id="quickTestBtn">
+                            <i class="fas fa-flask"></i> Quick Test
+                        </button>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress-container" id="progressContainer" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">Starting sweep...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="results-panel">
+                <div class="card">
+                    <h3><i class="fas fa-chart-line"></i> Test Results</h3>
+                    
+                    <!-- Rating Display -->
+                    <div class="rating-display">
+                        <div class="rating-badge" id="ratingBadge">
+                            <span id="ratingText">--</span>
+                        </div>
+                        <div class="score-info">
+                            <div class="score" id="scoreText">--</div>
+                            <div class="score-label">Score</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Results Content -->
+                    <div class="results-content">
+                        <div class="results-text" id="resultsText">
+                            Ready for test results...
+                        </div>
+                    </div>
+                    
+                    <!-- Navigation -->
+                    <div class="results-navigation">
+                        <div class="page-info" id="pageInfo">Page 1 of 1</div>
+                        <div class="nav-buttons">
+                            <button class="btn btn-secondary btn-small" onclick="previousPage()" id="prevBtn" disabled>
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="btn btn-primary btn-small" onclick="nextPage()" id="nextBtn" disabled>
+                                Next <i class="fas fa-chevron-right"></i>
+                            </button>
+                            <button class="btn btn-success btn-small" onclick="viewDetailed()" id="viewBtn" disabled>
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                            <button class="btn btn-primary btn-small" onclick="quickTest()" id="testBtn">
+                                <i class="fas fa-flask"></i> Test
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plot Panel -->
+            <div class="plot-panel">
+                <div class="card">
+                    <h3><i class="fas fa-chart-area"></i> SWR Analysis</h3>
+                    <div class="plot-container">
+                        <img id="plotImage" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMmEyYTI5Ii8+PHRleHQgeD0iMzAwIiB5PSIyMDAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iI2NjY2NjYyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+U1dSIEFuYWx5c2lzIFBsb3Q8L3RleHQ+PC9zdmc+" alt="SWR Plot">
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-history"></i> Test History</h3>
+                <button class="close-btn" onclick="closeHistoryModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="historyList" class="history-list">
+                    <!-- History items will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeHistoryModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailedModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3><i class="fas fa-chart-bar"></i> Detailed Results</h3>
+                <button class="close-btn" onclick="closeDetailedModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="detailedContent" class="detailed-content">
+                    <!-- Detailed content will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="copyToClipboard()">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+                <button class="btn btn-secondary" onclick="closeDetailedModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast"></div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
