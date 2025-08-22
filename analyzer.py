@@ -273,10 +273,10 @@ class ModernAntennaGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Modern Antenna Analyzer" + (" - Demo Mode" if MOCK_MODE else ""))
-        self.root.geometry("800x480")
-        self.root.resizable(False, False)  # Fixed size, not resizable
-        self.root.minsize(800, 480)
-        self.root.maxsize(800, 480)
+        self.root.geometry("1000x700")  # Default size, but resizable
+        self.root.resizable(True, True)  # Allow resizing
+        self.root.minsize(800, 600)  # Minimum size for usability
+        
         
         # Theme management
         self.is_dark_mode = True
@@ -441,7 +441,7 @@ Try the one-click sweep to see how it works!"""
         ok_btn.pack(anchor='e')
     
     def setup_modern_gui(self):
-        """Setup the modern GUI interface optimized for 800x480 screen"""
+        """Setup the modern GUI interface with flexible sizing"""
         # Main container - minimal padding for maximum space usage
         main_container = tk.Frame(self.root, bg=self.current_theme['bg_primary'])
         main_container.pack(fill='both', expand=True, padx=3, pady=3)
@@ -453,11 +453,11 @@ Try the one-click sweep to see how it works!"""
         content_area = tk.Frame(main_container, bg=self.current_theme['bg_primary'])
         content_area.pack(fill='both', expand=True, pady=(3, 0))
         
-        # Left panel - narrower to give more space to plot
+        # Left panel - flexible width for controls and results
         left_panel = tk.Frame(content_area, bg=self.current_theme['bg_primary'])
         left_panel.pack(side='left', fill='y', padx=(0, 3))
         
-        # Right panel (plot) - gets more space
+        # Right panel (plot) - gets remaining space
         right_panel = tk.Frame(content_area, bg=self.current_theme['bg_primary'])
         right_panel.pack(side='right', fill='both', expand=True)
         
@@ -465,6 +465,9 @@ Try the one-click sweep to see how it works!"""
         self.setup_control_panel(left_panel)
         self.setup_results_panel(left_panel)
         self.setup_plot_panel(right_panel)
+        
+        # Bind resize event to update plot
+        self.root.bind('<Configure>', self.on_window_resize)
     
     def create_header(self, parent):
         """Create modern header with buttons at the top"""
@@ -538,7 +541,7 @@ Try the one-click sweep to see how it works!"""
         """Setup modern control panel optimized for small screen"""
         control_card, control_content = self.create_modern_card(parent, "Test Parameters")
         control_card.pack(fill='x', pady=(0, 3))
-        control_card.configure(width=260)
+        # Remove fixed width constraint for flexible sizing
         
         # Demo mode indicator
         if MOCK_MODE:
@@ -612,7 +615,7 @@ Try the one-click sweep to see how it works!"""
         """Setup modern results panel with pagination system"""
         results_card, results_content = self.create_modern_card(parent, "Test Results")
         results_card.pack(fill='both', expand=True)
-        results_card.configure(width=260)
+        # Remove fixed width constraint for flexible sizing
         
         # Initialize pagination variables
         self.current_page = 0
@@ -716,8 +719,8 @@ Try the one-click sweep to see how it works!"""
         # Modern matplotlib styling
         plt.style.use('dark_background' if self.is_dark_mode else 'default')
         
-        # Optimized figure size for 800x480
-        self.fig = Figure(figsize=(6.5, 4), facecolor=self.current_theme['bg_card'])
+        # Flexible figure size that adapts to window size
+        self.fig = Figure(figsize=(8, 6), facecolor=self.current_theme['bg_card'])
         self.ax = self.fig.add_subplot(111)
         
         # Style the plot
@@ -1093,20 +1096,23 @@ Try the one-click sweep to see how it works!"""
                     'o', color=self.current_theme['success'], markersize=8, 
                     label=f'Min: {swr_values[min_swr_idx]:.2f}')
         
-        # Styling - smaller fonts
-        self.ax.set_xlabel('Frequency (MHz)', color=self.current_theme['text_primary'], fontsize=10)
-        self.ax.set_ylabel('SWR', color=self.current_theme['text_primary'], fontsize=10)
+        # Responsive styling based on window size
+        window_width = self.root.winfo_width()
+        base_font_size = max(8, min(12, window_width // 100))  # Responsive font size
+        
+        self.ax.set_xlabel('Frequency (MHz)', color=self.current_theme['text_primary'], fontsize=base_font_size)
+        self.ax.set_ylabel('SWR', color=self.current_theme['text_primary'], fontsize=base_font_size)
         title = 'Antenna SWR vs Frequency'
         if MOCK_MODE:
             title += ' (Demo)'
         self.ax.set_title(title, color=self.current_theme['text_primary'], 
-                         fontsize=11, fontweight='bold')
+                         fontsize=base_font_size + 1, fontweight='bold')
         
         self.ax.grid(True, alpha=0.2, color=self.current_theme['text_muted'])
         self.ax.legend(facecolor=self.current_theme['bg_card'], 
                       edgecolor=self.current_theme['border'],
                       labelcolor=self.current_theme['text_primary'],
-                      fontsize=8, loc='upper right')
+                      fontsize=max(7, base_font_size - 1), loc='upper right')
         
         # Set limits
         self.ax.set_ylim(1, min(max(swr_values) * 1.1, 10))
@@ -1114,7 +1120,7 @@ Try the one-click sweep to see how it works!"""
         # Style spines
         for spine in self.ax.spines.values():
             spine.set_color(self.current_theme['border'])
-        self.ax.tick_params(colors=self.current_theme['text_secondary'], labelsize=8)
+        self.ax.tick_params(colors=self.current_theme['text_secondary'], labelsize=max(7, base_font_size - 1))
         
         self.canvas.draw()
     
@@ -1308,10 +1314,10 @@ Try the one-click sweep to see how it works!"""
         # Sort files by modification time (newest first)
         json_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
         
-        # Create history window - smaller for 800x480
+        # Create history window with flexible sizing
         history_window = tk.Toplevel(self.root)
         history_window.title("Test History")
-        history_window.geometry("600x400")
+        history_window.geometry("700x500")
         history_window.configure(bg=self.current_theme['bg_primary'])
         history_window.transient(self.root)
         history_window.grab_set()
@@ -1534,6 +1540,14 @@ Try the one-click sweep to see how it works!"""
         
         self.canvas.draw()
         self.status_var.set("Ready to test" + (" - Demo Mode" if MOCK_MODE else ""))
+    
+    def on_window_resize(self, event):
+        """Handle window resize events"""
+        # Only handle main window resize, not child widgets
+        if event.widget == self.root:
+            # Redraw the plot to fit the new size
+            if hasattr(self, 'canvas') and self.measurements:
+                self.canvas.draw()
     
     def on_closing(self):
         """Handle application closing"""
