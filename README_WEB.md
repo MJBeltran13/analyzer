@@ -166,3 +166,4 @@ For issues and questions:
 ---
 
 **Note**: This web interface provides the same core functionality as the desktop version but with the convenience of web access. It's perfect for remote monitoring, mobile access, and integration with other web-based systems.
+

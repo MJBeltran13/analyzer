@@ -269,3 +269,4 @@ function showHistory() {
 function clearResults() {
     window.antennaAnalyzer.clearResults();
 }
+

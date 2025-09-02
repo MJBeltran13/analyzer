@@ -71,7 +71,7 @@ class SpiDev:
 # Add SpiDev to the module
 MockSpiDevModule.SpiDev = SpiDev
 
-  class MockADS1115:
+class MockADS1115:
     """Mock ADS1115 I2C ADC for Windows development"""
     
     # Mock pin constants
