@@ -20,12 +20,18 @@ import matplotlib.pyplot as plt
 # Import mock hardware for web development
 try:
     import RPi.GPIO as GPIO
-    import spidev
+    import board
+    import busio
+    import adafruit_ads1x15.ads1115 as ADS
+    from adafruit_ads1x15.analog_in import AnalogIn
     MOCK_MODE = False
 except ImportError:
     print("Running in mock mode for web development...")
-    from mock_hardware import MockGPIO as GPIO, MockSpiDevModule
-    spidev = MockSpiDevModule
+    from mock_hardware import MockGPIO as GPIO, MockADS1115
+    ADS = MockADS1115
+    AnalogIn = MockADS1115.AnalogIn
+    board = MockADS1115.board
+    busio = MockADS1115.busio
     MOCK_MODE = True
 
 app = Flask(__name__)
@@ -33,13 +39,15 @@ app.config['SECRET_KEY'] = 'your-secret-key-here'
 
 class WebAntennaAnalyzer:
     def __init__(self):
-        self.W_CLK = 18
-        self.FQ_UD = 24
-        self.DATA = 23
-        self.RESET = 25
+        self.W_CLK = 12
+        self.FQ_UD = 16
+        self.DATA = 20
+        self.RESET = 21
         self.ref_voltage = 3.3
-        self.adc_resolution = 1024
-        self.spi = None
+        self.adc_resolution = 65536  # 16-bit ADS1115
+        self.ads = None
+        self.chan0 = None  # Magnitude channel
+        self.chan1 = None  # Phase channel
         self.hardware_ready = False
         self.mock_mode = MOCK_MODE
         self.setup_hardware()
@@ -51,9 +59,12 @@ class WebAntennaAnalyzer:
             GPIO.output([self.W_CLK, self.FQ_UD, self.DATA], GPIO.LOW)
             GPIO.output(self.RESET, GPIO.HIGH)
             
-            self.spi = spidev.SpiDev()
-            self.spi.open(0, 0)
-            self.spi.max_speed_hz = 1000000
+            # Initialize ADS1115 I2C ADC
+            if not self.mock_mode:
+                i2c = busio.I2C(board.SCL, board.SDA)
+                self.ads = ADS.ADS1115(i2c)
+                self.chan0 = AnalogIn(self.ads, ADS.P0)  # Magnitude
+                self.chan1 = AnalogIn(self.ads, ADS.P1)  # Phase
             
             self.reset_dds()
             self.hardware_ready = True
@@ -61,7 +72,7 @@ class WebAntennaAnalyzer:
             if self.mock_mode:
                 print("✅ Mock hardware initialized (Web Demo Mode)")
             else:
-                print("✅ Real hardware initialized")
+                print("✅ Real hardware initialized (ADS1115 I2C ADC)")
         except Exception as e:
             print(f"Hardware initialization failed: {e}")
             self.hardware_ready = False
@@ -93,10 +104,17 @@ class WebAntennaAnalyzer:
         if not self.hardware_ready:
             return 0
         try:
-            adc = self.spi.xfer2([1, (8 + channel) << 4, 0])
-            data = ((adc[1] & 3) << 8) + adc[2]
-            voltage = (data * self.ref_voltage) / self.adc_resolution
-            return voltage
+            if self.mock_mode:
+                # Mock ADC reading for demo
+                return random.uniform(0.5, 2.5)
+            else:
+                # Read from ADS1115
+                if channel == 0:
+                    return self.chan0.voltage
+                elif channel == 1:
+                    return self.chan1.voltage
+                else:
+                    return 0
         except:
             return 0
     

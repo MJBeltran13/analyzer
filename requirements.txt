@@ -1,2 +1,4 @@
 numpy>=1.21.0
 matplotlib>=3.5.0
+adafruit-circuitpython-ads1x15>=2.2.21
+adafruit-blinka>=8.0.0

@@ -70,3 +70,41 @@ class SpiDev:
 
 # Add SpiDev to the module
 MockSpiDevModule.SpiDev = SpiDev
+
+  class MockADS1115:
+    """Mock ADS1115 I2C ADC for Windows development"""
+    
+    # Mock pin constants
+    P0 = 0
+    P1 = 1
+    P2 = 2
+    P3 = 3
+    
+    def __init__(self, i2c):
+        print("Mock ADS1115: Initialized I2C ADC")
+        self.i2c = i2c
+    
+    class AnalogIn:
+        """Mock AnalogIn for ADS1115 channels"""
+        def __init__(self, ads, pin):
+            self.ads = ads
+            self.pin = pin
+            print(f"Mock ADS1115: Setup channel {pin}")
+        
+        @property
+        def voltage(self):
+            # Return mock voltage reading with some variation
+            base_voltage = 1.5 + random.uniform(-0.5, 0.5)
+            return max(0.0, min(3.3, base_voltage))
+    
+    class board:
+        """Mock board for I2C pins"""
+        SCL = "SCL"
+        SDA = "SDA"
+    
+    class busio:
+        """Mock busio for I2C"""
+        @staticmethod
+        def I2C(scl, sda):
+            print(f"Mock I2C: Setup on {scl}/{sda}")
+            return "mock_i2c"
