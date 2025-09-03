@@ -108,11 +108,13 @@ class ModernAntennaAnalyzer:
             
             print(f"✅ ADS1115 configured: Gain={self.ads.gain}, Data Rate={self.ads.data_rate} SPS")
             
+            # Mark hardware ready before running self-test to avoid false warning
+            self.hardware_ready = True
+
             # Test ADC readings
             self.test_adc_readings()
-            
+
             self.reset_dds()
-            self.hardware_ready = True
             print("✅ Real hardware initialized (ADS1115 I2C ADC)")
         except Exception as e:
             print(f"❌ Hardware initialization failed: {e}")
