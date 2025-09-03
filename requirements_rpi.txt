@@ -1,0 +1,16 @@
+# Requirements for Raspberry Pi with ADS1115 ADC
+# Install with: pip3 install -r requirements_rpi.txt
+
+# Core libraries
+RPi.GPIO>=0.7.0
+adafruit-circuitpython-ads1x15>=1.3.0
+
+# Data processing and visualization
+numpy>=1.19.0
+matplotlib>=3.3.0
+
+# GUI (if using desktop)
+tkinter  # Usually comes with Python on Raspberry Pi
+
+# Optional: for better I2C performance
+smbus2>=0.4.0

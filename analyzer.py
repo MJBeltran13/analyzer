@@ -4,22 +4,12 @@ Modern Antenna Analyzer - shadcn-inspired Design
 Beautiful, modern UI for antenna testing with dark/light themes
 """
 
-# Import mock hardware for Windows development
-try:
-    import RPi.GPIO as GPIO
-    import board
-    import busio
-    import adafruit_ads1x15.ads1115 as ADS
-    from adafruit_ads1x15.analog_in import AnalogIn
-    MOCK_MODE = False
-except ImportError:
-    print("Running in mock mode for Windows development...")
-    from mock_hardware import MockGPIO as GPIO, MockADS1115
-    ADS = MockADS1115
-    AnalogIn = MockADS1115.AnalogIn
-    board = MockADS1115.board
-    busio = MockADS1115.busio
-    MOCK_MODE = True
+# Import real hardware libraries
+import RPi.GPIO as GPIO
+import board
+import busio
+import adafruit_ads1x15.ads1115 as ADS
+from adafruit_ads1x15.analog_in import AnalogIn
 
 import time
 import numpy as np
@@ -31,7 +21,6 @@ from tkinter import ttk, messagebox
 from datetime import datetime
 import json
 import os
-import random
 
 
 # Modern color scheme (shadcn-inspired)
@@ -87,7 +76,6 @@ class ModernAntennaAnalyzer:
         self.chan0 = None  # Magnitude channel
         self.chan1 = None  # Phase channel
         self.hardware_ready = False
-        self.mock_mode = MOCK_MODE
         self.setup_hardware()
 
     def setup_hardware(self):
@@ -99,21 +87,36 @@ class ModernAntennaAnalyzer:
             GPIO.output(self.RESET, GPIO.HIGH)
 
             # Initialize ADS1115 I2C ADC
-            if not self.mock_mode:
-                i2c = busio.I2C(board.SCL, board.SDA)
-                self.ads = ADS.ADS1115(i2c)
-                self.chan0 = AnalogIn(self.ads, ADS.P0)  # Magnitude
-                self.chan1 = AnalogIn(self.ads, ADS.P1)  # Phase
-
+            print("🔌 Initializing ADS1115 I2C ADC...")
+            i2c = busio.I2C(board.SCL, board.SDA)
+            
+            # Scan for I2C devices
+            print("🔍 Scanning I2C bus...")
+            i2c_devices = []
+            for device in i2c.scan():
+                i2c_devices.append(hex(device))
+            print(f"Found I2C devices: {i2c_devices}")
+            
+            self.ads = ADS.ADS1115(i2c)
+            
+            # Configure ADS1115 for optimal performance
+            self.ads.gain = 1  # ±4.096V range for better resolution
+            self.ads.data_rate = 860  # 860 samples per second for good speed/accuracy balance
+            
+            self.chan0 = AnalogIn(self.ads, ADS.P0)  # Magnitude
+            self.chan1 = AnalogIn(self.ads, ADS.P1)  # Phase
+            
+                        print(f"✅ ADS1115 configured: Gain={self.ads.gain}, Data Rate={self.ads.data_rate} SPS")
+            
+            # Test ADC readings
+            self.test_adc_readings()
+            
             self.reset_dds()
             self.hardware_ready = True
-
-            if self.mock_mode:
-                print("✅ Mock hardware initialized (Demo Mode)")
-            else:
-                print("✅ Real hardware initialized (ADS1115 I2C ADC)")
+            print("✅ Real hardware initialized (ADS1115 I2C ADC)")
         except Exception as e:
-            print(f"Hardware initialization failed: {e}")
+            print(f"❌ Hardware initialization failed: {e}")
+            print("Please check your I2C connections (SDA/SCL) and ensure ADS1115 is properly connected")
             self.hardware_ready = False
 
     def reset_dds(self):
@@ -143,31 +146,37 @@ class ModernAntennaAnalyzer:
         if not self.hardware_ready:
             return 0
         try:
-            if self.mock_mode:
-                # Mock ADC reading for demo
-                return random.uniform(0.5, 2.5)
+            # Read from ADS1115
+            if channel == 0:
+                voltage = self.chan0.voltage
+                raw_value = self.chan0.value
+                return voltage
+            elif channel == 1:
+                voltage = self.chan1.voltage
+                raw_value = self.chan1.value
+                return voltage
             else:
-                # Read from ADS1115
-                if channel == 0:
-                    return self.chan0.voltage
-                elif channel == 1:
-                    return self.chan1.voltage
-                else:
-                    return 0
-        except:
+                return 0
+        except Exception as e:
+            print(f"ADC read error on channel {channel}: {e}")
             return 0
 
-    def simulate_antenna_response(self, freq_hz):
-        """Simulate realistic antenna response"""
-        resonant_freq = 14.2e6
-        bandwidth = 2.0e6
-        freq_offset = abs(freq_hz - resonant_freq)
-        normalized_offset = freq_offset / bandwidth
-        base_swr = 1.1 + 2.0 * (normalized_offset ** 2)
-        harmonic_effect = 0.3 * np.sin(freq_hz / 1e6 * 0.5)
-        random_variation = random.uniform(-0.1, 0.1)
-        swr = base_swr + harmonic_effect + random_variation
-        return max(1.0, min(10.0, swr))
+    def test_adc_readings(self):
+        """Test ADC readings for troubleshooting"""
+        if not self.hardware_ready:
+            print("❌ Hardware not ready")
+            return
+        
+        print("🔍 Testing ADC readings...")
+        for i in range(5):
+            mag_voltage = self.read_adc(0)
+            phase_voltage = self.read_adc(1)
+            print(f"Sample {i+1}: Magnitude={mag_voltage:.3f}V, Phase={phase_voltage:.3f}V")
+            time.sleep(0.1)
+        
+        print("✅ ADC test completed")
+
+
 
     def measure_point(self, freq_hz):
         if not self.set_frequency(freq_hz):
@@ -176,21 +185,15 @@ class ModernAntennaAnalyzer:
         mag_voltage = self.read_adc(0)
         phase_voltage = self.read_adc(1)
 
-        if self.mock_mode:
-            swr = self.simulate_antenna_response(freq_hz)
-            reflection_coeff = (swr - 1) / (swr + 1)
-            mag_db = 20 * np.log10(reflection_coeff + 0.01)
-            mag_voltage = 0.9 + mag_db * 0.03
-            mag_voltage = max(0.5, min(2.5, mag_voltage))
+        # Calculate SWR from real ADC measurements
+        mag_db = (mag_voltage - 0.9) / 0.03
+        reflection_coeff = 10 ** (mag_db / 20.0)
+        reflection_coeff = min(reflection_coeff, 0.99)
+        if reflection_coeff >= 1.0:
+            swr = 999
         else:
-            mag_db = (mag_voltage - 0.9) / 0.03
-            reflection_coeff = 10 ** (mag_db / 20.0)
-            reflection_coeff = min(reflection_coeff, 0.99)
-            if reflection_coeff >= 1.0:
-                swr = 999
-            else:
-                swr = (1 + reflection_coeff) / (1 - reflection_coeff)
-                swr = min(swr, 50)
+            swr = (1 + reflection_coeff) / (1 - reflection_coeff)
+            swr = min(swr, 50)
 
         return {
             'frequency': freq_hz,
@@ -302,7 +305,7 @@ class ModernAntennaAnalyzer:
 class ModernAntennaGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Modern Antenna Analyzer" + (" - Demo Mode" if MOCK_MODE else ""))
+        self.root.title("Modern Antenna Analyzer - ADS1115 Hardware")
         self.root.geometry("800x480")   # Target screen
         self.root.resizable(True, True)
         self.root.minsize(640, 400)     # Allow smaller if needed
@@ -437,45 +440,7 @@ class ModernAntennaGUI:
         btn.bind("<Leave>", on_leave)
         return btn
 
-    def show_demo_info(self):
-        """Show modern demo info dialog"""
-        demo_window = tk.Toplevel(self.root)
-        demo_window.title("Demo Mode")
-        demo_window.geometry("500x400")
-        demo_window.configure(bg=self.current_theme['bg_primary'])
-        demo_window.resizable(False, False)
-        demo_window.transient(self.root)
-        demo_window.grab_set()
 
-        header_frame = tk.Frame(demo_window, bg=self.current_theme['bg_primary'])
-        header_frame.pack(fill='x', padx=30, pady=(30, 20))
-        icon_label = tk.Label(header_frame, text="🖥️", font=('Segoe UI', 32),
-                              bg=self.current_theme['bg_primary'])
-        icon_label.pack()
-
-        content_frame = tk.Frame(demo_window, bg=self.current_theme['bg_primary'])
-        content_frame.pack(fill='both', expand=True, padx=30, pady=20)
-        info_text = ("You're running the antenna analyzer in demonstration mode!\n\n"
-                     "This version simulates:\n"
-                     "• A realistic antenna response (dipole @ 14.2 MHz)\n"
-                     "• Hardware measurements and SWR calculations  \n"
-                     "• Complete modern GUI functionality\n\n"
-                     "To run on actual Raspberry Pi hardware:\n"
-                     "1. Copy files to Raspberry Pi\n"
-                     "2. Install: pip install -r requirements-rpi.txt\n"
-                     "3. Run: python3 antenna_tester.py\n\n"
-                     "Try the one-click sweep to see how it works!")
-        text_label = tk.Label(content_frame, text=info_text,
-                              font=('Segoe UI', 10),
-                              bg=self.current_theme['bg_primary'],
-                              fg=self.current_theme['text_secondary'],
-                              justify='left')
-        text_label.pack(anchor='w')
-
-        btn_frame = tk.Frame(demo_window, bg=self.current_theme['bg_primary'])
-        btn_frame.pack(fill='x', padx=30, pady=(0, 30))
-        ok_btn = self.create_modern_button(btn_frame, "Got it!", demo_window.destroy)
-        ok_btn.pack(anchor='e')
 
     def setup_modern_gui(self):
         """Setup the modern GUI interface with flexible sizing"""
@@ -524,9 +489,7 @@ class ModernAntennaGUI:
                                fg=self.current_theme['text_primary'])
         title_label.pack(anchor='w')
 
-        subtitle_text = "RF Testing Suite"
-        if MOCK_MODE:
-            subtitle_text += " • Demo"
+        subtitle_text = "RF Testing Suite • ADS1115 Hardware"
         subtitle_label = tk.Label(title_frame, text=subtitle_text,
                                   font=('Segoe UI', 8),
                                   bg=self.current_theme['bg_primary'],
@@ -568,7 +531,7 @@ class ModernAntennaGUI:
         progress_canvas.pack(fill='x')
         self.progress_canvas = progress_canvas
 
-        self.status_var = tk.StringVar(value="Ready to test" + (" - Demo Mode" if MOCK_MODE else ""))
+        self.status_var = tk.StringVar(value="Ready to test - ADS1115 Hardware")
         status_label = tk.Label(sweep_row, textvariable=self.status_var,
                                 font=('Segoe UI', 8),
                                 bg=self.current_theme['bg_primary'],
@@ -580,15 +543,15 @@ class ModernAntennaGUI:
         control_card, control_content = self.create_modern_card(parent, "Test Parameters")
         control_card.pack(fill='x', pady=(0, 3))
 
-        if MOCK_MODE:
-            demo_frame = tk.Frame(control_content, bg=self.current_theme['bg_muted'], relief='solid', bd=1)
-            demo_frame.pack(fill='x', pady=(0, 5))
-            demo_label = tk.Label(demo_frame, text="DEMO",
+        # Hardware status frame
+        hw_frame = tk.Frame(control_content, bg=self.current_theme['bg_muted'], relief='solid', bd=1)
+        hw_frame.pack(fill='x', pady=(0, 5))
+        hw_label = tk.Label(hw_frame, text="ADS1115 I2C ADC",
                                   font=('Segoe UI', 8, 'bold'),
                                   bg=self.current_theme['bg_muted'],
-                                  fg=self.current_theme['accent'],
+                                  fg=self.current_theme['success'],
                                   pady=2)
-            demo_label.pack()
+        hw_label.pack()
 
         freq_frame = tk.Frame(control_content, bg=self.current_theme['bg_card'])
         freq_frame.pack(fill='x', pady=(0, 5))
@@ -824,7 +787,7 @@ class ModernAntennaGUI:
             self.progress_canvas.create_rectangle(0, 0, progress_width, 6,
                                                   fill=self.current_theme['accent'],
                                                   outline="")
-        self.status_var.set(f"Measuring point {current}/{total}" + (" (Demo)" if MOCK_MODE else ""))
+        self.status_var.set(f"Measuring point {current}/{total}")
         self.root.update_idletasks()
 
     def one_click_sweep(self):
@@ -846,7 +809,7 @@ class ModernAntennaGUI:
 
             self.sweep_button.configure(state='disabled', text="Sweeping...")
             self.progress_var.set(0)
-            self.status_var.set("Starting sweep..." + (" (Demo)" if MOCK_MODE else ""))
+            self.status_var.set("Starting sweep...")
 
             start_time = time.time()
             self.measurements = self.analyzer.frequency_sweep(
@@ -854,14 +817,13 @@ class ModernAntennaGUI:
             )
             sweep_time = time.time() - start_time
 
-            self.status_var.set("Analyzing results..." + (" (Demo)" if MOCK_MODE else ""))
+            self.status_var.set("Analyzing results...")
             rating_result = self.analyzer.rate_antenna_performance(self.measurements)
 
             self.update_modern_results_display(rating_result, sweep_time)
             self.plot_modern_results()
 
-            self.status_var.set(f"✅ Sweep completed in {sweep_time:.1f}s - Rating: {rating_result['rating']}"
-                                + (" (Demo)" if MOCK_MODE else ""))
+            self.status_var.set(f"✅ Sweep completed in {sweep_time:.1f}s - Rating: {rating_result['rating']}")
 
         except ValueError as e:
             messagebox.showerror("Error", f"Invalid input: {e}")
@@ -895,15 +857,13 @@ class ModernAntennaGUI:
         self.results_pages = []
 
         page1 = f"ANTENNA PERFORMANCE ANALYSIS\n"
-        if MOCK_MODE:
-            page1 += f"DEMO MODE - Simulated Results\n"
+        page1 += f"ADS1115 HARDWARE MODE\n"
         page1 += f"{'='*40}\n\n"
         page1 += f"Test completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         page1 += f"Sweep time: {sweep_time:.1f} seconds\n"
         page1 += f"Frequency range: {float(self.start_freq_var.get()):.1f} - {float(self.stop_freq_var.get()):.1f} MHz\n"
         page1 += f"Measurement points: {len(self.measurements)}\n"
-        if MOCK_MODE:
-            page1 += f"Simulated antenna: Dipole (resonant at ~14.2 MHz)\n"
+        page1 += f"Hardware: ADS1115 I2C ADC\n"
         page1 += f"\nOVERALL RATING: {rating_result['rating']} ({rating_result['score']:.0f}/100)\n\n"
         page1 += "SUMMARY:\n"
         page1 += f"• Minimum SWR: {rating_result['stats']['min_swr']:.2f}\n"
@@ -950,14 +910,13 @@ class ModernAntennaGUI:
             page3 += f"• Minimum SWR at resonance: {min_swr:.2f}\n"
             page3 += f"• Frequency range tested: {frequencies[0]:.1f} - {frequencies[-1]:.1f} MHz\n"
             page3 += f"• Total bandwidth tested: {frequencies[-1] - frequencies[0]:.1f} MHz\n\n"
-        if MOCK_MODE:
-            page3 += f"DEMO MODE INFORMATION:\n"
-            page3 += f"{'-'*30}\n"
-            page3 += "• This simulates a realistic dipole antenna\n"
-            page3 += "• Try different frequency ranges to see varying results\n"
-            page3 += "• The 10-20 MHz range shows good performance\n"
-            page3 += "• Real hardware will show actual antenna measurements\n"
-            page3 += "• Simulated resonance at ~14.2 MHz\n"
+        page3 += f"HARDWARE INFORMATION:\n"
+        page3 += f"{'-'*30}\n"
+        page3 += "• Using ADS1115 16-bit I2C ADC\n"
+        page3 += "• Connected via SDA/SCL pins\n"
+        page3 += "• Real-time voltage measurements\n"
+        page3 += "• Actual antenna response data\n"
+        page3 += "• Professional-grade accuracy\n"
         self.results_pages.append(page3)
 
     def display_current_page(self):
@@ -1026,9 +985,7 @@ class ModernAntennaGUI:
 
         self.ax.set_xlabel('Frequency (MHz)', color=self.current_theme['text_primary'], fontsize=11)
         self.ax.set_ylabel('SWR', color=self.current_theme['text_primary'], fontsize=11)
-        title = 'Antenna SWR vs Frequency'
-        if MOCK_MODE:
-            title += ' (Demo)'
+        title = 'Antenna SWR vs Frequency - ADS1115 Hardware'
         self.ax.set_title(title, color=self.current_theme['text_primary'], fontsize=12, fontweight='bold')
         self.ax.grid(True, alpha=0.25, color=self.current_theme['text_muted'], linewidth=0.8)
         self.ax.set_ylim(1, min(max(swr_values) * 1.1, 10))
@@ -1069,7 +1026,7 @@ class ModernAntennaGUI:
             filename = f"antenna_test_{timestamp}.json"
             data = {
                 'timestamp': datetime.now().isoformat(),
-                'demo_mode': MOCK_MODE,
+                'hardware_mode': 'ADS1115_I2C_ADC',
                 'parameters': {
                     'start_freq': float(self.start_freq_var.get()),
                     'stop_freq': float(self.stop_freq_var.get()),
@@ -1132,8 +1089,6 @@ if __name__ == '__main__':
     try:
         root = tk.Tk()
         app = ModernAntennaGUI(root)
-        if MOCK_MODE:
-            root.after(200, app.show_demo_info)
         root.mainloop()
     except Exception as e:
         print(f"Failed to launch GUI: {e}")
