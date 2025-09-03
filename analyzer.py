@@ -538,10 +538,21 @@ class ModernAntennaGUI:
         b1 = self.create_modern_button(button_frame, "Save", self.save_results, "secondary")
         b2 = self.create_modern_button(button_frame, "History", self.show_history, "secondary")
         b3 = self.create_modern_button(button_frame, "Clear", self.clear_results, "secondary")
+        b4 = self.create_modern_button(button_frame, "◀ Previous", self.previous_page, "primary")
+        b5 = self.create_modern_button(button_frame, "Next ▶", self.next_page, "primary")
+        b6 = self.create_modern_button(button_frame, "View", self.view_detailed_results, "success")
         b1.pack(side='left', padx=(0, 3))
         b2.pack(side='left', padx=(0, 3))
         b3.pack(side='left', padx=(0, 3))
-        self._compact_buttons += [b1, b2, b3]
+        b4.pack(side='left', padx=(0, 3))
+        b5.pack(side='left', padx=(0, 3))
+        b6.pack(side='left', padx=(0, 3))
+        self._compact_buttons += [b1, b2, b3, b4, b5, b6]
+        
+        # Store references to navigation buttons
+        self.prev_button = b4
+        self.next_button = b5
+        self.view_button = b6
 
         sweep_row = tk.Frame(header, bg=self.current_theme['bg_primary'])
         sweep_row.pack(fill='x', pady=(0, 2))
@@ -684,19 +695,11 @@ class ModernAntennaGUI:
         button_frame = tk.Frame(pagination_frame, bg=self.current_theme['bg_card'])
         button_frame.pack(side='right')
 
-        self.prev_button = self.create_modern_button(button_frame, "◀", self.previous_page, "secondary")
-        self.next_button = self.create_modern_button(button_frame, "Next ▶", self.next_page, "primary")
-        self.view_button = self.create_modern_button(button_frame, "View", self.view_detailed_results, "success")
         self.test_button = self.create_modern_button(button_frame, "Test", self.quick_test, "primary")
 
         # Keep references for compacting on small screens
-        for b in [self.prev_button, self.next_button, self.view_button, self.test_button]:
-            b.pack(side='left', padx=(0, 2))
-        self._compact_buttons += [self.prev_button, self.next_button, self.view_button, self.test_button]
-
-        self.prev_button.configure(state='disabled')
-        self.next_button.configure(state='disabled')
-        self.view_button.configure(state='disabled')
+        self.test_button.pack(side='left', padx=(0, 2))
+        self._compact_buttons += [self.test_button]
 
         self.results_text.insert(tk.END, "Ready for test results...\n")
         self.results_text.see(tk.END)

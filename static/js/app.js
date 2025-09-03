@@ -3,12 +3,15 @@
 class AntennaAnalyzer {
     constructor() {
         this.currentResults = null;
+        this.history = null;
+        this.currentHistoryIndex = 0;
         this.init();
     }
 
     init() {
         // Initialize the interface
         console.log('Antenna Analyzer Web Interface initialized');
+        this.updateNavigationButtons();
     }
 
     async performSweep() {
@@ -191,20 +194,108 @@ class AntennaAnalyzer {
 
     displayHistory(history) {
         if (history.length === 0) {
-            alert('No previous test results found.');
+            this.showError('No previous test results found.');
             return;
         }
 
-        let historyText = 'Previous Test Results:\n\n';
-        history.forEach((item, index) => {
-            historyText += `${index + 1}. ${item.timestamp}\n`;
-            historyText += `   Range: ${item.start_freq}-${item.stop_freq} MHz\n`;
-            historyText += `   Rating: ${item.rating} (${item.score}/100)\n`;
-            if (item.demo_mode) historyText += `   [DEMO MODE]\n`;
-            historyText += '\n';
-        });
+        // Store history for navigation
+        this.history = history;
+        this.currentHistoryIndex = 0;
 
-        alert(historyText);
+        // Display first item
+        this.displayHistoryItem(0);
+        
+        // Enable navigation buttons
+        this.updateNavigationButtons();
+    }
+
+    displayHistoryItem(index) {
+        if (!this.history || index < 0 || index >= this.history.length) {
+            return;
+        }
+
+        const item = this.history[index];
+        this.currentHistoryIndex = index;
+
+        // Display the item details
+        let content = `
+            <h4>📊 Test Result ${index + 1} of ${this.history.length}</h4>
+            <p><strong>Date:</strong> ${item.timestamp}</p>
+            <p><strong>Frequency Range:</strong> ${item.start_freq} - ${item.stop_freq} MHz</p>
+            <p><strong>Rating:</strong> ${item.rating} (${item.score}/100)</p>
+            ${item.demo_mode ? '<p><strong>Mode:</strong> Demo</p>' : ''}
+            <p><strong>File:</strong> ${item.filename}</p>
+        `;
+
+        document.getElementById('resultsContent').innerHTML = content;
+        
+        // Update navigation buttons
+        this.updateNavigationButtons();
+    }
+
+    updateNavigationButtons() {
+        const backBtn = document.getElementById('backBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const viewBtn = document.getElementById('viewBtn');
+
+        if (this.history && this.history.length > 0) {
+            backBtn.disabled = this.currentHistoryIndex <= 0;
+            nextBtn.disabled = this.currentHistoryIndex >= this.history.length - 1;
+            viewBtn.disabled = false;
+        } else {
+            backBtn.disabled = true;
+            nextBtn.disabled = true;
+            viewBtn.disabled = true;
+        }
+    }
+
+    goBack() {
+        if (this.history && this.currentHistoryIndex > 0) {
+            this.displayHistoryItem(this.currentHistoryIndex - 1);
+        }
+    }
+
+    goNext() {
+        if (this.history && this.currentHistoryIndex < this.history.length - 1) {
+            this.displayHistoryItem(this.currentHistoryIndex + 1);
+        }
+    }
+
+    async viewCurrent() {
+        if (!this.history || this.currentHistoryIndex < 0 || this.currentHistoryIndex >= this.history.length) {
+            return;
+        }
+
+        const item = this.history[this.currentHistoryIndex];
+        
+        try {
+            const response = await fetch(`/api/load/${item.filename}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                // Display the loaded results
+                this.displayResults(data);
+                this.currentResults = data;
+                
+                // Update form fields with loaded parameters
+                if (data.data && data.data.parameters) {
+                    document.getElementById('startFreq').value = data.data.parameters.start_freq;
+                    document.getElementById('stopFreq').value = data.data.parameters.stop_freq;
+                    document.getElementById('points').value = data.data.parameters.points;
+                }
+                
+                // Update plot if available
+                if (data.plot_data) {
+                    document.getElementById('plotImage').src = `data:image/png;base64,${data.plot_data}`;
+                }
+                
+                this.showSuccess('Test results loaded successfully');
+            } else {
+                this.showError('Error loading test: ' + data.error);
+            }
+        } catch (error) {
+            this.showError('Error loading test: ' + error.message);
+        }
     }
 
     showLoading(show) {
@@ -240,6 +331,12 @@ class AntennaAnalyzer {
         document.getElementById('resultsContent').innerHTML = 'Ready for test results...';
         document.getElementById('plotImage').src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMmEyYTI5Ii8+PHRleHQgeD0iMzAwIiB5PSIyMDAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iI2NjY2NjYyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+U1dSIEFuYWx5c2lzIFBsb3Q8L3RleHQ+PC9zdmc+';
         this.currentResults = null;
+        
+        // Clear navigation state
+        this.history = null;
+        this.currentHistoryIndex = 0;
+        this.updateNavigationButtons();
+        
         this.showSuccess('Results cleared');
     }
 }
@@ -268,5 +365,17 @@ function showHistory() {
 
 function clearResults() {
     window.antennaAnalyzer.clearResults();
+}
+
+function goBack() {
+    window.antennaAnalyzer.goBack();
+}
+
+function goNext() {
+    window.antennaAnalyzer.goNext();
+}
+
+function viewCurrent() {
+    window.antennaAnalyzer.viewCurrent();
 }
 

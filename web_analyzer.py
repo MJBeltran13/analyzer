@@ -347,148 +347,120 @@
 #     except Exception as e:
 #         return jsonify({'error': str(e)}), 500
 
-# @app.route('/api/history')
-# def get_history():
-#     try:
-#         import glob
-#         json_files = glob.glob("antenna_test_*.json")
+@app.route('/api/history')
+def get_history():
+    try:
+        history = []
+        for filename in os.listdir('.'):
+            if filename.endswith('.json') and filename.startswith('antenna_test_'):
+                try:
+                    with open(filename, 'r') as f:
+                        data = json.load(f)
+                        history.append({
+                            'filename': filename,
+                            'timestamp': data.get('timestamp', 'Unknown'),
+                            'start_freq': data.get('start_freq', 0),
+                            'stop_freq': data.get('stop_freq', 0),
+                            'rating': data.get('rating', 'Unknown'),
+                            'score': data.get('score', 0),
+                            'demo_mode': data.get('demo_mode', False)
+                        })
+                except:
+                    pass
         
-#         history = []
-#         for filename in json_files:
-#             try:
-#                 with open(filename, 'r') as f:
-#                     data = json.load(f)
-                
-#                 timestamp = data.get('timestamp', 'Unknown')
-#                 if timestamp != 'Unknown':
-#                     try:
-#                         dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-#                         date_str = dt.strftime('%Y-%m-%d %H:%M:%S')
-#                     except:
-#                         date_str = timestamp[:19]
-#                 else:
-#                     date_str = 'Unknown'
-                
-#                 params = data.get('parameters', {})
-#                 rating_info = data.get('rating', {})
-                
-#                 history.append({
-#                     'filename': filename,
-#                     'timestamp': date_str,
-#                     'start_freq': params.get('start_freq', 'N/A'),
-#                     'stop_freq': params.get('stop_freq', 'N/A'),
-#                     'rating': rating_info.get('rating', 'N/A'),
-#                     'score': rating_info.get('score', 0),
-#                     'demo_mode': data.get('demo_mode', False)
-#                 })
-                
-#             except Exception as e:
-#                 mod_time = datetime.fromtimestamp(os.path.getmtime(filename))
-#                 date_str = mod_time.strftime('%Y-%m-%d %H:%M:%S')
-#                 history.append({
-#                     'filename': filename,
-#                     'timestamp': date_str,
-#                     'start_freq': 'N/A',
-#                     'stop_freq': 'N/A',
-#                     'rating': 'N/A',
-#                     'score': 0,
-#                     'demo_mode': False,
-#                     'error': 'Cannot read file'
-#                 })
+        history.sort(key=lambda x: x['timestamp'], reverse=True)
         
-#         history.sort(key=lambda x: x['timestamp'], reverse=True)
+        return jsonify({'success': True, 'history': history})
         
-#         return jsonify({'success': True, 'history': history})
-        
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-# @app.route('/api/load/<filename>')
-# def load_results(filename):
-#     try:
-#         with open(filename, 'r') as f:
-#             data = json.load(f)
+@app.route('/api/load/<filename>')
+def load_results(filename):
+    try:
+        with open(filename, 'r') as f:
+            data = json.load(f)
         
-#         measurements = data.get('measurements', [])
-#         plot_data = generate_plot(measurements) if measurements else None
+        measurements = data.get('measurements', [])
+        plot_data = generate_plot(measurements) if measurements else None
         
-#         return jsonify({
-#             'success': True,
-#             'data': data,
-#             'plot_data': plot_data
-#         })
+        return jsonify({
+            'success': True,
+            'data': data,
+            'plot_data': plot_data
+        })
         
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-# @app.route('/api/delete/<filename>')
-# def delete_results(filename):
-#     try:
-#         os.remove(filename)
-#         return jsonify({'success': True})
+@app.route('/api/delete/<filename>')
+def delete_results(filename):
+    try:
+        os.remove(filename)
+        return jsonify({'success': True})
         
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-# def generate_plot(measurements):
-#     if not measurements:
-#         return None
+def generate_plot(measurements):
+    if not measurements:
+        return None
     
-#     fig, ax = plt.subplots(figsize=(10, 6))
-#     fig.patch.set_facecolor('#1a1a1a')
-#     ax.set_facecolor('#2a2a2a')
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.patch.set_facecolor('#1a1a1a')
+    ax.set_facecolor('#2a2a2a')
     
-#     frequencies = [m['frequency'] / 1e6 for m in measurements]
-#     swr_values = [m['swr'] for m in measurements]
+    frequencies = [m['frequency'] / 1e6 for m in measurements]
+    swr_values = [m['swr'] for m in measurements]
     
-#     ax.plot(frequencies, swr_values, color='#3b82f6', linewidth=2, label='SWR', alpha=0.9)
+    ax.plot(frequencies, swr_values, color='#3b82f6', linewidth=2, label='SWR', alpha=0.9)
     
-#     ax.axhline(y=1.5, color='#22c55e', linestyle='--', alpha=0.7, linewidth=1.5, label='1.5')
-#     ax.axhline(y=2.0, color='#f59e0b', linestyle='--', alpha=0.7, linewidth=1.5, label='2.0')
-#     ax.axhline(y=3.0, color='#ef4444', linestyle='--', alpha=0.7, linewidth=1.5, label='3.0')
+    ax.axhline(y=1.5, color='#22c55e', linestyle='--', alpha=0.7, linewidth=1.5, label='1.5')
+    ax.axhline(y=2.0, color='#f59e0b', linestyle='--', alpha=0.7, linewidth=1.5, label='2.0')
+    ax.axhline(y=3.0, color='#ef4444', linestyle='--', alpha=0.7, linewidth=1.5, label='3.0')
     
-#     min_swr_idx = np.argmin(swr_values)
-#     ax.plot(frequencies[min_swr_idx], swr_values[min_swr_idx], 
-#             'o', color='#22c55e', markersize=10, 
-#             label=f'Min: {swr_values[min_swr_idx]:.2f}')
+    min_swr_idx = np.argmin(swr_values)
+    ax.plot(frequencies[min_swr_idx], swr_values[min_swr_idx], 
+            'o', color='#22c55e', markersize=10, 
+            label=f'Min: {swr_values[min_swr_idx]:.2f}')
     
-#     ax.set_xlabel('Frequency (MHz)', color='#ffffff', fontsize=12)
-#     ax.set_ylabel('SWR', color='#ffffff', fontsize=12)
-#     title = 'Antenna SWR vs Frequency'
-#     if MOCK_MODE:
-#         title += ' (Demo)'
-#     ax.set_title(title, color='#ffffff', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Frequency (MHz)', color='#ffffff', fontsize=12)
+    ax.set_ylabel('SWR', color='#ffffff', fontsize=12)
+    title = 'Antenna SWR vs Frequency'
+    if MOCK_MODE:
+        title += ' (Demo)'
+    ax.set_title(title, color='#ffffff', fontsize=14, fontweight='bold')
     
-#     ax.grid(True, alpha=0.2, color='#666666')
-#     ax.legend(facecolor='#1a1a1a', edgecolor='#444444',
-#               labelcolor='#ffffff', fontsize=10, loc='upper right')
+    ax.grid(True, alpha=0.2, color='#666666')
+    ax.legend(facecolor='#1a1a1a', edgecolor='#444444',
+              labelcolor='#ffffff', fontsize=10, loc='upper right')
     
-#     ax.set_ylim(1, min(max(swr_values) * 1.1, 10))
+    ax.set_ylim(1, min(max(swr_values) * 1.1, 10))
     
-#     for spine in ax.spines.values():
-#         spine.set_color('#444444')
-#     ax.tick_params(colors='#cccccc', labelsize=10)
+    for spine in ax.spines.values():
+        spine.set_color('#444444')
+    ax.tick_params(colors='#cccccc', labelsize=10)
     
-#     img_buffer = io.BytesIO()
-#     fig.savefig(img_buffer, format='png', dpi=100, bbox_inches='tight', 
-#                 facecolor='#1a1a1a', edgecolor='none')
-#     img_buffer.seek(0)
-#     img_data = base64.b64encode(img_buffer.getvalue()).decode()
-#     plt.close(fig)
+    img_buffer = io.BytesIO()
+    fig.savefig(img_buffer, format='png', dpi=100, bbox_inches='tight', 
+                facecolor='#1a1a1a', edgecolor='none')
+    img_buffer.seek(0)
+    img_data = base64.b64encode(img_buffer.getvalue()).decode()
+    plt.close(fig)
     
-#     return img_data
+    return img_data
 
-# if __name__ == '__main__':
-#     print("Starting Web Antenna Analyzer...")
-#     print(f"Mode: {'Demo' if MOCK_MODE else 'Hardware'}")
-#     print("Server will be available at: http://localhost:5000")
-#     print("Open in your browser to access the web interface")
+if __name__ == '__main__':
+    print("Starting Web Antenna Analyzer...")
+    print(f"Mode: {'Demo' if MOCK_MODE else 'Hardware'}")
+    print("Server will be available at: http://localhost:5000")
+    print("Open in your browser to access the web interface")
     
-#     try:
-#         app.run(host='0.0.0.0', port=5000, debug=True)
-#     except KeyboardInterrupt:
-#         print("\nShutting down...")
-#         analyzer.cleanup()
-#     except Exception as e:
-#         print(f"Error: {e}")
-#         analyzer.cleanup()
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=True)
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+        analyzer.cleanup()
+    except Exception as e:
+        print(f"Error: {e}")
+        analyzer.cleanup()
