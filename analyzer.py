@@ -106,7 +106,7 @@ class ModernAntennaAnalyzer:
             self.chan0 = AnalogIn(self.ads, ADS.P0)  # Magnitude
             self.chan1 = AnalogIn(self.ads, ADS.P1)  # Phase
             
-                        print(f"✅ ADS1115 configured: Gain={self.ads.gain}, Data Rate={self.ads.data_rate} SPS")
+            print(f"✅ ADS1115 configured: Gain={self.ads.gain}, Data Rate={self.ads.data_rate} SPS")
             
             # Test ADC readings
             self.test_adc_readings()
