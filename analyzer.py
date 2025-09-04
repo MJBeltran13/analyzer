@@ -129,16 +129,18 @@ class ModernAntennaAnalyzer:
         GPIO.output(self.RESET, GPIO.HIGH)
 
     def set_frequency(self, freq_hz):
-        """Program AD9851 via 3-wire serial: 32-bit FTW + 8-bit control, LSB-first.
-        Assumes on-board 30 MHz crystal with 6× PLL enabled → f_sys = 180 MHz.
+        """Program AD9850 via 3-wire serial: 32-bit FTW + 8-bit control, LSB-first.
+        Uses 125 MHz reference clock (no PLL) as in provided Arduino example.
         """
         if not self.hardware_ready:
             return False
 
-        system_clock_hz = 180_000_000.0  # AD9851: 30 MHz × 6 PLL
+        # AD9850 reference clock
+        system_clock_hz = 125_000_000.0
         ftw = int((freq_hz * 4294967296.0) / system_clock_hz) & 0xFFFFFFFF
 
-        control_byte = 0x01  # Enable 6× PLL, all else default (no power-down)
+        # AD9850 control byte (0x00 for default operation)
+        control_byte = 0x00
 
         # Load 32-bit FTW, LSB-first
         for bit_index in range(32):
