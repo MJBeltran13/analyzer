@@ -129,17 +129,32 @@ class ModernAntennaAnalyzer:
         GPIO.output(self.RESET, GPIO.HIGH)
 
     def set_frequency(self, freq_hz):
+        """Program AD9851 via 3-wire serial: 32-bit FTW + 8-bit control, LSB-first.
+        Assumes on-board 30 MHz crystal with 6× PLL enabled → f_sys = 180 MHz.
+        """
         if not self.hardware_ready:
             return False
-        freq_word = int((freq_hz * 4294967296.0) / 125000000.0)
-        for i in range(32):
-            GPIO.output(self.DATA, (freq_word >> (31 - i)) & 1)
+
+        system_clock_hz = 180_000_000.0  # AD9851: 30 MHz × 6 PLL
+        ftw = int((freq_hz * 4294967296.0) / system_clock_hz) & 0xFFFFFFFF
+
+        control_byte = 0x01  # Enable 6× PLL, all else default (no power-down)
+
+        # Load 32-bit FTW, LSB-first
+        for bit_index in range(32):
+            bit = (ftw >> bit_index) & 0x1
+            GPIO.output(self.DATA, GPIO.HIGH if bit else GPIO.LOW)
             GPIO.output(self.W_CLK, GPIO.HIGH)
             GPIO.output(self.W_CLK, GPIO.LOW)
-        for i in range(8):
-            GPIO.output(self.DATA, GPIO.LOW)
+
+        # Load 8-bit control byte, LSB-first
+        for bit_index in range(8):
+            bit = (control_byte >> bit_index) & 0x1
+            GPIO.output(self.DATA, GPIO.HIGH if bit else GPIO.LOW)
             GPIO.output(self.W_CLK, GPIO.HIGH)
             GPIO.output(self.W_CLK, GPIO.LOW)
+
+        # Latch the 40-bit word
         GPIO.output(self.FQ_UD, GPIO.HIGH)
         GPIO.output(self.FQ_UD, GPIO.LOW)
         return True
