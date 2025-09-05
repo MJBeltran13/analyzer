@@ -81,12 +81,7 @@ class ModernAntennaAnalyzer:
     def setup_hardware(self):
         """Initialize GPIO and I2C ADC"""
         try:
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup([self.W_CLK, self.FQ_UD, self.DATA, self.RESET], GPIO.OUT)
-            GPIO.output([self.W_CLK, self.FQ_UD, self.DATA], GPIO.LOW)
-            GPIO.output(self.RESET, GPIO.HIGH)
-
-            # Initialize ADS1115 I2C ADC
+            # Initialize ADS1115 I2C ADC FIRST (before GPIO to avoid conflicts)
             print("🔌 Initializing ADS1115 I2C ADC...")
             i2c = busio.I2C(board.SCL, board.SDA)
             
@@ -114,8 +109,15 @@ class ModernAntennaAnalyzer:
             # Test ADC readings
             self.test_adc_readings()
 
+            # Initialize GPIO AFTER I2C (to avoid conflicts)
+            print("🔌 Initializing GPIO for AD9850...")
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup([self.W_CLK, self.FQ_UD, self.DATA, self.RESET], GPIO.OUT)
+            GPIO.output([self.W_CLK, self.FQ_UD, self.DATA], GPIO.LOW)
+            GPIO.output(self.RESET, GPIO.HIGH)
+
             self.reset_dds()
-            print("✅ Real hardware initialized (ADS1115 I2C ADC)")
+            print("✅ Real hardware initialized (ADS1115 I2C ADC + AD9850 DDS)")
         except Exception as e:
             print(f"❌ Hardware initialization failed: {e}")
             print("Please check your I2C connections (SDA/SCL) and ensure ADS1115 is properly connected")

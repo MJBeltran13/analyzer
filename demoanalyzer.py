@@ -361,6 +361,25 @@ def main():
             btn.bind("<Leave>", on_leave)
             return btn
 
+        def adjust_float(self, tk_variable, delta, min_value, max_value, decimals=1):
+            try:
+                current_value = float(tk_variable.get())
+                new_value = current_value + float(delta)
+                new_value = max(min_value, min(max_value, new_value))
+                format_str = f"{new_value:.{decimals}f}"
+                tk_variable.set(format_str)
+            except Exception:
+                pass
+
+        def adjust_int(self, tk_variable, delta, min_value, max_value):
+            try:
+                current_value = int(tk_variable.get())
+                new_value = current_value + int(delta)
+                new_value = max(min_value, min(max_value, new_value))
+                tk_variable.set(str(new_value))
+            except Exception:
+                pass
+
         def setup_modern_gui(self):
             """Setup the modern GUI interface with flexible sizing"""
             main_container = tk.Frame(self.root, bg=self.current_theme['bg_primary'])
@@ -466,7 +485,22 @@ def main():
                                    bg=self.current_theme['bg_muted'],
                                    fg=self.current_theme['text_primary'],
                                    relief='solid', bd=1)
-            start_entry.pack(fill='x', pady=(1, 0))
+            start_row = tk.Frame(start_frame, bg=self.current_theme['bg_card'])
+            start_row.pack(fill='x', pady=(1, 0))
+            start_entry = tk.Entry(start_row, textvariable=self.start_freq_var,
+                                   font=('Segoe UI', 9),
+                                   bg=self.current_theme['bg_muted'],
+                                   fg=self.current_theme['text_primary'],
+                                   relief='solid', bd=1)
+            start_entry.pack(side='left', fill='x', expand=True)
+            start_dec_btn = tk.Button(start_row, text='−', command=lambda: self.adjust_float(self.start_freq_var, -1.0, 0.1, 10000.0, 1),
+                                      bg=self.current_theme['bg_muted'], fg=self.current_theme['text_primary'],
+                                      relief='solid', bd=1, width=3, padx=6)
+            start_inc_btn = tk.Button(start_row, text='+', command=lambda: self.adjust_float(self.start_freq_var, +1.0, 0.1, 10000.0, 1),
+                                      bg=self.current_theme['bg_muted'], fg=self.current_theme['text_primary'],
+                                      relief='solid', bd=1, width=3, padx=6)
+            start_dec_btn.pack(side='left', padx=(4, 2))
+            start_inc_btn.pack(side='left', padx=(2, 0))
 
             stop_frame = tk.Frame(freq_frame, bg=self.current_theme['bg_card'])
             stop_frame.pack(fill='x', pady=(0, 3))
@@ -480,7 +514,22 @@ def main():
                                   bg=self.current_theme['bg_muted'],
                                   fg=self.current_theme['text_primary'],
                                   relief='solid', bd=1)
-            stop_entry.pack(fill='x', pady=(1, 0))
+            stop_row = tk.Frame(stop_frame, bg=self.current_theme['bg_card'])
+            stop_row.pack(fill='x', pady=(1, 0))
+            stop_entry = tk.Entry(stop_row, textvariable=self.stop_freq_var,
+                                  font=('Segoe UI', 9),
+                                  bg=self.current_theme['bg_muted'],
+                                  fg=self.current_theme['text_primary'],
+                                  relief='solid', bd=1)
+            stop_entry.pack(side='left', fill='x', expand=True)
+            stop_dec_btn = tk.Button(stop_row, text='−', command=lambda: self.adjust_float(self.stop_freq_var, -1.0, 0.1, 10000.0, 1),
+                                     bg=self.current_theme['bg_muted'], fg=self.current_theme['text_primary'],
+                                     relief='solid', bd=1, width=3, padx=6)
+            stop_inc_btn = tk.Button(stop_row, text='+', command=lambda: self.adjust_float(self.stop_freq_var, +1.0, 0.1, 10000.0, 1),
+                                     bg=self.current_theme['bg_muted'], fg=self.current_theme['text_primary'],
+                                     relief='solid', bd=1, width=3, padx=6)
+            stop_dec_btn.pack(side='left', padx=(4, 2))
+            stop_inc_btn.pack(side='left', padx=(2, 0))
 
             points_frame = tk.Frame(freq_frame, bg=self.current_theme['bg_card'])
             points_frame.pack(fill='x')
@@ -494,7 +543,22 @@ def main():
                                     bg=self.current_theme['bg_muted'],
                                     fg=self.current_theme['text_primary'],
                                     relief='solid', bd=1)
-            points_entry.pack(fill='x', pady=(1, 0))
+            points_row = tk.Frame(points_frame, bg=self.current_theme['bg_card'])
+            points_row.pack(fill='x', pady=(1, 0))
+            points_entry = tk.Entry(points_row, textvariable=self.points_var,
+                                    font=('Segoe UI', 9),
+                                    bg=self.current_theme['bg_muted'],
+                                    fg=self.current_theme['text_primary'],
+                                    relief='solid', bd=1)
+            points_entry.pack(side='left', fill='x', expand=True)
+            points_dec_btn = tk.Button(points_row, text='−', command=lambda: self.adjust_int(self.points_var, -1, 10, 1000),
+                                       bg=self.current_theme['bg_muted'], fg=self.current_theme['text_primary'],
+                                       relief='solid', bd=1, width=3, padx=6)
+            points_inc_btn = tk.Button(points_row, text='+', command=lambda: self.adjust_int(self.points_var, +1, 10, 1000),
+                                       bg=self.current_theme['bg_muted'], fg=self.current_theme['text_primary'],
+                                       relief='solid', bd=1, width=3, padx=6)
+            points_dec_btn.pack(side='left', padx=(4, 2))
+            points_inc_btn.pack(side='left', padx=(2, 0))
 
         def setup_results_panel(self, parent):
             """Setup modern results panel with pagination system"""
