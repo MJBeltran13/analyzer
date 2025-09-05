@@ -171,7 +171,7 @@ def main():
     except Exception:
         # Fallback to a non-GUI run with defaults
         start, stop, points = 10.0, 40.0, 200
-                        analyzer = Analyzer(start, stop, points)
+        analyzer = Analyzer(start, stop, points)
         print(f"Running sweep {start:.1f}–{stop:.1f} MHz, {points} points...")
         t0 = time.time()
         measurements = analyzer.run_sweep()
