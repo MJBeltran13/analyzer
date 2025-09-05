@@ -419,9 +419,11 @@ def main():
             button_frame.pack(side='right')
             b1 = self.create_modern_button(button_frame, "Save", self.save_results, "secondary")
             b2 = self.create_modern_button(button_frame, "Clear", self.clear_results, "secondary")
+            b3 = self.create_modern_button(button_frame, "Summary", self.view_summary, "secondary")
             b1.pack(side='left', padx=(0, 3))
             b2.pack(side='left', padx=(0, 3))
-            self._compact_buttons += [b1, b2]
+            b3.pack(side='left', padx=(0, 3))
+            self._compact_buttons += [b1, b2, b3]
 
             sweep_row = tk.Frame(header, bg=self.current_theme['bg_primary'])
             sweep_row.pack(fill='x', pady=(0, 2))
@@ -720,8 +722,6 @@ def main():
             results_text += f"• Minimum SWR: {rating_result['min_swr']:.2f}\n"
             results_text += f"• Average SWR: {rating_result['avg_swr']:.2f}\n"
             results_text += f"• Points measured: {len(self.measurements)}\n"
-            results_text += f"• Test mode: Random test data\n"
-            results_text += f"• No hardware required\n"
             
             self.results_text.insert(1.0, results_text)
             self.results_text.see("1.0")
@@ -803,6 +803,90 @@ def main():
                 messagebox.showinfo("Save", f"Saved to {filename}")
             except Exception as e:
                 messagebox.showerror("Error", f"Save failed: {e}")
+
+        def view_summary(self):
+            """Show a summary dialog with key test results"""
+            try:
+                if not self.measurements:
+                    messagebox.showinfo("Summary", "No test results available. Please run a sweep first.")
+                    return
+                
+                # Calculate summary statistics
+                swrs = [m['swr'] for m in self.measurements]
+                min_swr = min(swrs)
+                max_swr = max(swrs)
+                avg_swr = sum(swrs) / len(swrs)
+                good_points = sum(1 for swr in swrs if swr <= 2.0)
+                excellent_points = sum(1 for swr in swrs if swr <= 1.5)
+                
+                # Find frequency at minimum SWR
+                min_swr_idx = swrs.index(min_swr)
+                min_swr_freq = self.measurements[min_swr_idx]['frequency'] / 1e6
+                
+                summary_text = f"""ANTENNA TEST SUMMARY
+{'='*50}
+
+Test Parameters:
+• Frequency Range: {float(self.start_freq_var.get()):.1f} - {float(self.stop_freq_var.get()):.1f} MHz
+• Measurement Points: {len(self.measurements)}
+• Test Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+SWR Analysis:
+• Minimum SWR: {min_swr:.2f} at {min_swr_freq:.1f} MHz
+• Maximum SWR: {max_swr:.2f}
+• Average SWR: {avg_swr:.2f}
+
+Performance Rating:
+• Overall Grade: {self.rating_var.get()}
+• Score: {self.score_var.get()}
+• Excellent Points (≤1.5): {excellent_points}/{len(self.measurements)} ({excellent_points/len(self.measurements)*100:.1f}%)
+• Good Points (≤2.0): {good_points}/{len(self.measurements)} ({good_points/len(self.measurements)*100:.1f}%)
+
+Recommendations:
+• Best operating frequency: {min_swr_freq:.1f} MHz
+• SWR performance: {'Excellent' if min_swr <= 1.5 else 'Good' if min_swr <= 2.0 else 'Fair' if min_swr <= 3.0 else 'Poor'}
+"""
+                
+                # Create summary window
+                summary_window = tk.Toplevel(self.root)
+                summary_window.title("Test Summary")
+                summary_window.geometry("500x600")
+                summary_window.configure(bg=self.current_theme['bg_primary'])
+                summary_window.resizable(True, True)
+                
+                # Make it modal
+                summary_window.transient(self.root)
+                summary_window.grab_set()
+                
+                # Create text widget with scrollbar
+                text_frame = tk.Frame(summary_window, bg=self.current_theme['bg_primary'])
+                text_frame.pack(fill='both', expand=True, padx=10, pady=10)
+                
+                text_widget = tk.Text(text_frame, 
+                                    bg=self.current_theme['bg_muted'],
+                                    fg=self.current_theme['text_primary'],
+                                    font=('Consolas', 10),
+                                    wrap='word',
+                                    padx=10, pady=10)
+                
+                scrollbar = tk.Scrollbar(text_frame, orient='vertical', command=text_widget.yview)
+                text_widget.configure(yscrollcommand=scrollbar.set)
+                
+                text_widget.pack(side='left', fill='both', expand=True)
+                scrollbar.pack(side='right', fill='y')
+                
+                text_widget.insert('1.0', summary_text)
+                text_widget.configure(state='disabled')
+                
+                # Close button
+                button_frame = tk.Frame(summary_window, bg=self.current_theme['bg_primary'])
+                button_frame.pack(fill='x', padx=10, pady=(0, 10))
+                
+                close_button = self.create_modern_button(button_frame, "Close", summary_window.destroy, "primary")
+                close_button.pack(anchor='center')
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to show summary: {e}")
 
     root = tk.Tk()
     app = ModernGUI(root)
