@@ -207,14 +207,20 @@ class ModernAntennaAnalyzer:
         phase_voltage = self.read_adc(1)
 
         # Calculate SWR from real ADC measurements
-        mag_db = (mag_voltage - 0.9) / 0.03
-        reflection_coeff = 10 ** (mag_db / 20.0)
-        reflection_coeff = min(reflection_coeff, 0.99)
-        if reflection_coeff >= 1.0:
-            swr = 999
+        # Adjust formula for your hardware's voltage range (1.0-1.1V)
+        # Map voltage to SWR: 1.0V = SWR 1.0, 1.1V = SWR 3.0
+        if mag_voltage <= 1.0:
+            swr = 1.0  # Perfect match
+        elif mag_voltage <= 1.1:
+            # Linear interpolation between 1.0V (SWR=1.0) and 1.1V (SWR=3.0)
+            swr = 1.0 + ((mag_voltage - 1.0) / 0.1) * 2.0
         else:
-            swr = (1 + reflection_coeff) / (1 - reflection_coeff)
-            swr = min(swr, 50)
+            # For higher voltages, use exponential curve
+            excess_voltage = mag_voltage - 1.1
+            swr = 3.0 + excess_voltage * 10.0
+        
+        # Clamp SWR to reasonable range
+        swr = max(1.0, min(swr, 50.0))
 
         return {
             'frequency': freq_hz,
