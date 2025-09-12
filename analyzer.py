@@ -1052,7 +1052,12 @@ class ModernAntennaGUI:
             self.update_modern_results_display(rating_result, sweep_time)
             self.plot_modern_results()
 
-            self.status_var.set(f"✅ Sweep completed in {sweep_time:.1f}s - Rating: {rating_result['rating']}")
+            # Override status rating if no antenna detected
+            no_antenna_points = sum(1 for m in (self.measurements or []) if not m.get('antenna_connected', True))
+            total_points_measured = len(self.measurements) if hasattr(self, 'measurements') and self.measurements else 0
+            no_antenna = (total_points_measured > 0) and (no_antenna_points / total_points_measured >= 0.8)
+            rating_display = 'F' if no_antenna else rating_result['rating']
+            self.status_var.set(f"✅ Sweep completed in {sweep_time:.1f}s - Rating: {rating_display}")
 
         except ValueError as e:
             messagebox.showerror("Error", f"Invalid input: {e}")
@@ -1158,20 +1163,31 @@ class ModernAntennaGUI:
         stats = rating_result['stats']
         page2 += "RECOMMENDATIONS:\n"
         page2 += f"{'-'*30}\n"
-        if score >= 85:
-            page2 += "Excellent antenna performance! No adjustments needed.\n"
-        elif score >= 70:
-            page2 += "Good antenna performance. Minor tuning could improve bandwidth.\n"
-        elif score >= 50:
-            page2 += "Acceptable performance. Consider adjusting antenna length or matching network.\n"
+
+        # Check no-antenna condition to avoid showing Excellent/Good text
+        no_antenna_points = sum(1 for m in (self.measurements or []) if not m.get('antenna_connected', True))
+        total_points_measured = len(self.measurements) if hasattr(self, 'measurements') and self.measurements else 0
+        no_antenna = (total_points_measured > 0) and (no_antenna_points / total_points_measured >= 0.8)
+
+        if no_antenna:
+            page2 += "No antenna connected detected. Please connect an antenna and retest.\n"
+            page2 += "• Ensure the analyzer circuit is correctly built and wired.\n"
+            page2 += "• Verify the DUT port has a proper load (antenna or dummy load).\n"
         else:
-            page2 += "Poor performance. Antenna requires significant adjustment or redesign.\n"
-        if stats['min_swr'] > 2.0:
-            page2 += "• Check antenna resonance - may need length adjustment\n"
-        if stats['good_ratio'] < 0.5:
-            page2 += "• Consider adding matching network to improve bandwidth\n"
-        if stats['avg_swr'] > 3.0:
-            page2 += "• Check all connections and ensure proper grounding\n"
+            if score >= 85:
+                page2 += "Excellent antenna performance! No adjustments needed.\n"
+            elif score >= 70:
+                page2 += "Good antenna performance. Minor tuning could improve bandwidth.\n"
+            elif score >= 50:
+                page2 += "Acceptable performance. Consider adjusting antenna length or matching network.\n"
+            else:
+                page2 += "Poor performance. Antenna requires significant adjustment or redesign.\n"
+            if stats['min_swr'] > 2.0:
+                page2 += "• Check antenna resonance - may need length adjustment\n"
+            if stats['good_ratio'] < 0.5:
+                page2 += "• Consider adding matching network to improve bandwidth\n"
+            if stats['avg_swr'] > 3.0:
+                page2 += "• Check all connections and ensure proper grounding\n"
         self.results_pages.append(page2)
 
         page3 = f"TECHNICAL DETAILS\n"
