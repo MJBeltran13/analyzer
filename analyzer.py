@@ -1065,28 +1065,37 @@ class ModernAntennaGUI:
 
     def update_modern_results_display(self, rating_result, sweep_time):
         """Update results with pagination system"""
-        self.rating_var.set(rating_result['rating'])
+        # Determine if no antenna was connected during the test
+        no_antenna_points = sum(1 for m in (self.measurements or []) if not m.get('antenna_connected', True))
+        total_points_measured = len(self.measurements) if hasattr(self, 'measurements') and self.measurements else 0
+        no_antenna = (total_points_measured > 0) and (no_antenna_points / total_points_measured >= 0.8)
+
+        rating_display = 'F' if no_antenna else rating_result['rating']
+        self.rating_var.set(rating_display)
+
         score = rating_result['score']
         score_text = f"{score:.0f}/100"
-        # Build labels similar to "no antenna connected"
+        # Build labels
         labels = []
-        if score > 88:
+        if no_antenna or score > 88:
             labels.append("no antenna connected")
-        # Performance label
-        if score >= 85:
-            labels.append("Excellent")
-        elif score >= 70:
-            labels.append("Good")
-        elif score >= 50:
-            labels.append("Acceptable")
-        else:
-            labels.append("Bad")
+        if not no_antenna:
+            if score >= 85:
+                labels.append("Excellent")
+            elif score >= 70:
+                labels.append("Good")
+            elif score >= 50:
+                labels.append("Acceptable")
+            else:
+                labels.append("Bad")
         if labels:
             score_text += f" (" + "; ".join(labels) + ")"
         self.score_var.set(score_text)
 
         score = rating_result['score']
-        if score >= 80:
+        if no_antenna:
+            self.rating_badge.configure(bg=self.current_theme['error'])
+        elif score >= 80:
             self.rating_badge.configure(bg=self.current_theme['success'])
         elif score >= 60:
             self.rating_badge.configure(bg=self.current_theme['warning'])
@@ -1110,22 +1119,29 @@ class ModernAntennaGUI:
         page1 += f"Frequency range: {float(self.start_freq_var.get()):.1f} - {float(self.stop_freq_var.get()):.1f} MHz\n"
         page1 += f"Measurement points: {len(self.measurements)}\n"
         page1 += f"Hardware: ADS1115 I2C ADC\n"
+        # Determine if no antenna was connected during the test
+        no_antenna_points = sum(1 for m in (self.measurements or []) if not m.get('antenna_connected', True))
+        total_points_measured = len(self.measurements) if hasattr(self, 'measurements') and self.measurements else 0
+        no_antenna = (total_points_measured > 0) and (no_antenna_points / total_points_measured >= 0.8)
+
         score = rating_result['score']
         score_text = f"{score:.0f}/100"
         labels = []
-        if score > 88:
+        if no_antenna or score > 88:
             labels.append("no antenna connected")
-        if score >= 85:
-            labels.append("Excellent")
-        elif score >= 70:
-            labels.append("Good")
-        elif score >= 50:
-            labels.append("Acceptable")
-        else:
-            labels.append("Bad")
+        if not no_antenna:
+            if score >= 85:
+                labels.append("Excellent")
+            elif score >= 70:
+                labels.append("Good")
+            elif score >= 50:
+                labels.append("Acceptable")
+            else:
+                labels.append("Bad")
         if labels:
             score_text += f" (" + "; ".join(labels) + ")"
-        page1 += f"\nOVERALL RATING: {rating_result['rating']} ({score_text})\n\n"
+        rating_display = 'F' if no_antenna else rating_result['rating']
+        page1 += f"\nOVERALL RATING: {rating_display} ({score_text})\n\n"
         page1 += "SUMMARY:\n"
         page1 += f"• Minimum SWR: {rating_result['stats']['min_swr']:.2f}\n"
         page1 += f"• Average SWR: {rating_result['stats']['avg_swr']:.2f}\n"
