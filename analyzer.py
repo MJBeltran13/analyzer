@@ -206,30 +206,45 @@ class ModernAntennaAnalyzer:
             phase_avg = sum(phase_readings) / len(phase_readings)
             print(f"📊 Average readings: Magnitude={mag_avg:.3f}V, Phase={phase_avg:.3f}V")
             
-            # Show what SWR this would produce (using fixed calculation)
-            if mag_avg <= 0.1:
-                swr = 1.0
-            elif mag_avg <= 0.5:
-                swr = 1.0 + ((mag_avg - 0.1) / 0.4) * 0.5
-            elif mag_avg <= 0.8:
-                swr = 1.5 + ((mag_avg - 0.5) / 0.3) * 1.5
-            elif mag_avg <= 1.2:
-                swr = 2.0 + ((mag_avg - 0.8) / 0.4) * 1.0
-            elif mag_avg <= 2.0:
-                swr = 3.0 + ((mag_avg - 1.2) / 0.8) * 2.0
+            # Show what SWR this would produce (using calibrated calculation)
+            # Simulate antenna detection
+            antenna_connected = phase_avg < 1.35 or (phase_avg < 1.4 and mag_avg < 0.97)
+            
+            if not antenna_connected:
+                swr = 8.0  # No antenna
             else:
-                excess_voltage = mag_avg - 2.0
-                swr = 5.0 + excess_voltage * 5.0
+                # Use calibrated SWR calculation
+                if mag_avg <= 0.95:
+                    swr = 1.0 + (0.95 - mag_avg) * 2.0
+                elif mag_avg <= 0.97:
+                    swr = 1.0 + (mag_avg - 0.95) * 5.0
+                elif mag_avg <= 0.98:
+                    swr = 2.0 + (mag_avg - 0.97) * 10.0
+                else:
+                    swr = 3.0 + (mag_avg - 0.98) * 20.0
+                
+                # Adjust based on phase
+                if phase_avg < 1.3:
+                    swr *= 0.8
+                elif phase_avg > 1.4:
+                    swr *= 1.3
             
             swr = max(1.0, min(swr, 50.0))
-            print(f"📈 Calculated SWR: {swr:.2f}")
+            antenna_status = "WITH antenna" if antenna_connected else "WITHOUT antenna"
+            print(f"📈 Calculated SWR: {swr:.2f} ({antenna_status})")
             
-            if mag_avg < 0.5:
+            if mag_avg < 0.9:
                 print("⚠️  WARNING: Very low magnitude voltage detected!")
                 print("   This may indicate:")
                 print("   - No antenna connected")
                 print("   - Antenna analyzer circuit not built")
                 print("   - ADC not receiving magnitude signal")
+            elif mag_avg > 1.0:
+                print("⚠️  WARNING: High magnitude voltage detected!")
+                print("   This may indicate:")
+                print("   - Open circuit (no antenna)")
+                print("   - Poor antenna match")
+                print("   - Circuit calibration issue")
         
         print("✅ ADC test completed")
 
@@ -238,7 +253,7 @@ class ModernAntennaAnalyzer:
     def detect_antenna_connection(self, mag_voltage, phase_voltage):
         """
         Detect if an antenna is connected based on voltage patterns.
-        This is a heuristic that may need adjustment for your specific hardware.
+        Calibrated based on actual hardware measurements from 2025-09-12.
         """
         # If voltages are extremely low (near zero), definitely no antenna
         if mag_voltage < 0.1 and phase_voltage < 0.1:
@@ -248,13 +263,19 @@ class ModernAntennaAnalyzer:
         if mag_voltage > 3.5 or phase_voltage > 3.5:
             return False
         
-        # For your specific case: if voltages are consistently in the 0.7V range
-        # and you know no antenna is connected, we need to treat this as poor performance
-        # The issue is that your circuit gives similar readings with/without antenna
+        # Calibrated detection based on actual measurements:
+        # WITH antenna: Mag=0.966V±0.004V, Phase=1.321V±0.059V
+        # WITHOUT antenna: Mag=0.976V±0.003V, Phase=1.381V±0.046V
         
-        # For now, assume antenna is connected and let SWR calculation handle the rating
-        # You may need to manually adjust the SWR thresholds based on your testing
-        return True
+        # Use phase voltage as primary indicator (more variation)
+        # Antenna connected when phase voltage is lower (better match)
+        if phase_voltage < 1.35:  # Below average of both conditions
+            return True
+        elif phase_voltage > 1.4:  # Above no-antenna average
+            return False
+        else:
+            # In the middle range, use magnitude as secondary indicator
+            return mag_voltage < 0.97  # Slightly below no-antenna average
 
     def measure_point(self, freq_hz):
         if not self.set_frequency(freq_hz):
@@ -267,31 +288,39 @@ class ModernAntennaAnalyzer:
         antenna_connected = self.detect_antenna_connection(mag_voltage, phase_voltage)
         
         # Calculate SWR from real ADC measurements
-        # Fixed formula that handles actual voltage ranges from ADS1115
-        # Based on debug analysis: actual voltages are 0.7V range, not 1.0V+
+        # Calibrated based on actual hardware measurements from 2025-09-12
+        # WITH antenna: Mag=0.966V±0.004V, Phase=1.321V±0.059V
+        # WITHOUT antenna: Mag=0.976V±0.003V, Phase=1.381V±0.046V
         
         if not antenna_connected:
             # No antenna detected - show very poor SWR
-            swr = 10.0  # Very poor match
-        elif mag_voltage <= 0.1:
-            # Very low voltage = perfect match
-            swr = 1.0
-        elif mag_voltage <= 0.5:
-            # Low voltage range: 0.1V = SWR 1.0, 0.5V = SWR 1.5
-            swr = 1.0 + ((mag_voltage - 0.1) / 0.4) * 0.5
-        elif mag_voltage <= 0.8:
-            # Medium voltage range: 0.5V = SWR 1.5, 0.8V = SWR 3.0 (increased for realism)
-            swr = 1.5 + ((mag_voltage - 0.5) / 0.3) * 1.5
-        elif mag_voltage <= 1.2:
-            # Higher voltage range: 0.8V = SWR 2.0, 1.2V = SWR 3.0
-            swr = 2.0 + ((mag_voltage - 0.8) / 0.4) * 1.0
-        elif mag_voltage <= 2.0:
-            # High voltage range: 1.2V = SWR 3.0, 2.0V = SWR 5.0
-            swr = 3.0 + ((mag_voltage - 1.2) / 0.8) * 2.0
+            swr = 8.0  # Very poor match (open circuit)
         else:
-            # Very high voltage = extreme mismatch
-            excess_voltage = mag_voltage - 2.0
-            swr = 5.0 + excess_voltage * 5.0
+            # Calibrated SWR calculation based on actual voltage ranges
+            # Use both magnitude and phase for better accuracy
+            
+            # Base SWR from magnitude voltage (primary indicator)
+            if mag_voltage <= 0.95:
+                # Very good match (below antenna average)
+                swr = 1.0 + (0.95 - mag_voltage) * 2.0  # 0.95V = SWR 1.0, 0.90V = SWR 2.0
+            elif mag_voltage <= 0.97:
+                # Good match (around antenna average)
+                swr = 1.0 + (mag_voltage - 0.95) * 5.0  # 0.95V = SWR 1.0, 0.97V = SWR 2.0
+            elif mag_voltage <= 0.98:
+                # Fair match (approaching no-antenna range)
+                swr = 2.0 + (mag_voltage - 0.97) * 10.0  # 0.97V = SWR 2.0, 0.98V = SWR 3.0
+            else:
+                # Poor match (in no-antenna range)
+                swr = 3.0 + (mag_voltage - 0.98) * 20.0  # 0.98V = SWR 3.0, 0.99V = SWR 5.0
+            
+            # Adjust based on phase voltage (secondary indicator)
+            # Lower phase voltage indicates better match
+            if phase_voltage < 1.3:
+                # Very good phase - reduce SWR
+                swr *= 0.8
+            elif phase_voltage > 1.4:
+                # Poor phase - increase SWR
+                swr *= 1.3
         
         # Clamp SWR to reasonable range
         swr = max(1.0, min(swr, 50.0))

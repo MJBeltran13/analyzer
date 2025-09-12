@@ -1,0 +1,102 @@
+(.venv) user@raspberrypi:~/Downloads/analyzer $ python3 antenna_data_collector.py --without-antenna --start 10.0 --stop 20.0 --points 50
+🔌 Initializing ADS1115 I2C ADC...
+🔍 Scanning I2C bus...
+Found I2C devices: ['0x17', '0x40', '0x45', '0x48', '0x68']
+✅ ADS1115 configured: Gain=1, Data Rate=860 SPS
+🔍 Testing ADC readings...
+Sample 1: Magnitude=1.503V, Phase=1.469V
+Sample 2: Magnitude=0.992V, Phase=1.552V
+Sample 3: Magnitude=0.992V, Phase=1.536V
+Sample 4: Magnitude=0.995V, Phase=1.572V
+Sample 5: Magnitude=0.992V, Phase=1.509V
+📊 Average readings: Magnitude=1.095V, Phase=1.528V
+✅ ADC test completed
+🔌 Initializing GPIO for AD9850...
+✅ Real hardware initialized (ADS1115 I2C ADC + AD9850 DDS)
+
+🔄 Starting data collection WITHOUT antenna...
+Please disconnect your antenna and press Enter when ready...
+
+
+============================================================
+📡 COLLECTING DATA - WITHOUT ANTENNA
+Frequency range: 10.0 - 20.0 MHz
+Points: 50
+============================================================
+Measuring 10.00 MHz (1/50)... Mag=0.976V, Phase=1.421V
+Measuring 10.20 MHz (2/50)... Mag=0.971V, Phase=1.394V
+Measuring 10.41 MHz (3/50)... Mag=0.975V, Phase=1.406V
+Measuring 10.61 MHz (4/50)... Mag=0.974V, Phase=1.383V
+Measuring 10.82 MHz (5/50)... Mag=0.978V, Phase=1.415V
+Measuring 11.02 MHz (6/50)... Mag=0.976V, Phase=1.341V
+Measuring 11.22 MHz (7/50)... Mag=0.979V, Phase=1.423V
+Measuring 11.43 MHz (8/50)... Mag=0.973V, Phase=1.360V
+Measuring 11.63 MHz (9/50)... Mag=0.979V, Phase=1.401V
+Measuring 11.84 MHz (10/50)... Mag=0.980V, Phase=1.416V
+Measuring 12.04 MHz (11/50)... Mag=0.978V, Phase=1.406V
+Measuring 12.24 MHz (12/50)... Mag=0.977V, Phase=1.392V
+Measuring 12.45 MHz (13/50)... Mag=0.976V, Phase=1.415V
+Measuring 12.65 MHz (14/50)... Mag=0.977V, Phase=1.419V
+Measuring 12.86 MHz (15/50)... Mag=0.978V, Phase=1.425V
+Measuring 13.06 MHz (16/50)... Mag=0.973V, Phase=1.379V
+Measuring 13.27 MHz (17/50)... Mag=0.976V, Phase=1.399V
+Measuring 13.47 MHz (18/50)... Mag=0.974V, Phase=1.357V
+Measuring 13.67 MHz (19/50)... Mag=0.971V, Phase=1.413V
+Measuring 13.88 MHz (20/50)... Mag=0.975V, Phase=1.429V
+Measuring 14.08 MHz (21/50)... Mag=0.974V, Phase=1.405V
+Measuring 14.29 MHz (22/50)... Mag=0.973V, Phase=1.373V
+Measuring 14.49 MHz (23/50)... Mag=0.975V, Phase=1.365V
+Measuring 14.69 MHz (24/50)... Mag=0.972V, Phase=1.379V
+Measuring 14.90 MHz (25/50)... Mag=0.972V, Phase=1.384V
+Measuring 15.10 MHz (26/50)... Mag=0.975V, Phase=1.434V
+Measuring 15.31 MHz (27/50)... Mag=0.975V, Phase=1.415V
+Measuring 15.51 MHz (28/50)... Mag=0.972V, Phase=1.343V
+Measuring 15.71 MHz (29/50)... Mag=0.975V, Phase=1.371V
+Measuring 15.92 MHz (30/50)... Mag=0.975V, Phase=1.344V
+Measuring 16.12 MHz (31/50)... Mag=0.976V, Phase=1.416V
+Measuring 16.33 MHz (32/50)... Mag=0.976V, Phase=1.414V
+Measuring 16.53 MHz (33/50)... Mag=0.968V, Phase=1.297V
+Measuring 16.73 MHz (34/50)... Mag=0.971V, Phase=1.252V
+Measuring 16.94 MHz (35/50)... Mag=0.975V, Phase=1.372V
+Measuring 17.14 MHz (36/50)... Mag=0.981V, Phase=1.379V
+Measuring 17.35 MHz (37/50)... Mag=0.979V, Phase=1.386V
+Measuring 17.55 MHz (38/50)... Mag=0.982V, Phase=1.398V
+Measuring 17.76 MHz (39/50)... Mag=0.980V, Phase=1.433V
+Measuring 17.96 MHz (40/50)... Mag=0.978V, Phase=1.278V
+Measuring 18.16 MHz (41/50)... Mag=0.966V, Phase=1.266V
+Measuring 18.37 MHz (42/50)... Mag=0.978V, Phase=1.396V
+Measuring 18.57 MHz (43/50)... Mag=0.978V, Phase=1.300V
+Measuring 18.78 MHz (44/50)... Mag=0.973V, Phase=1.288V
+Measuring 18.98 MHz (45/50)... Mag=0.982V, Phase=1.403V
+Measuring 19.18 MHz (46/50)... Mag=0.979V, Phase=1.422V
+Measuring 19.39 MHz (47/50)... Mag=0.978V, Phase=1.376V
+Measuring 19.59 MHz (48/50)... Mag=0.972V, Phase=1.311V
+Measuring 19.80 MHz (49/50)... Mag=0.976V, Phase=1.446V
+Measuring 20.00 MHz (50/50)... Mag=0.980V, Phase=1.403V
+
+✅ Collected 50 measurements
+
+============================================================
+📊 STATISTICS - WITHOUT ANTENNA
+============================================================
+Total measurements: 50
+
+Magnitude Voltage:
+  Min: 0.966V
+  Max: 0.982V
+  Mean: 0.976V
+  Std Dev: 0.003V
+  Range: 0.016V
+
+Phase Voltage:
+  Min: 1.252V
+  Max: 1.446V
+  Mean: 1.381V
+  Std Dev: 0.046V
+  Range: 0.194V
+💾 Data saved to: antenna_data_without_antenna_20250912_143212.json
+
+✅ Data collection completed!
+📁 Check the generated JSON files for detailed measurements.
+📊 Use this data to adjust the analyzer.py calibration formulas.
+🧹 GPIO cleanup completed
