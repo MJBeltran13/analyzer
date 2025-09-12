@@ -53,7 +53,12 @@ PY
     python3 -m venv "$VENV_DIR" || { echo "Failed to create venv at $VENV_DIR."; echo "Install with: sudo apt install -y python3-venv"; read -p "Press Enter to exit..."; exit 1; }
 fi
 
-[ -f "$VENV_DIR/bin/activate" ] || { echo "Venv activation script missing at $VENV_DIR/bin/activate"; read -p "Press Enter to exit..."; exit 1; }
+# If the venv looks broken, recreate it
+if [ ! -f "$VENV_DIR/bin/activate" ]; then
+    echo "Venv activation script missing at $VENV_DIR/bin/activate. Recreating venv..."
+    rm -rf "$VENV_DIR"
+    python3 -m venv "$VENV_DIR" || { echo "Failed to recreate venv at $VENV_DIR."; echo "Install with: sudo apt install -y python3-venv"; read -p "Press Enter to exit..."; exit 1; }
+fi
 source "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
 
