@@ -30,11 +30,30 @@ cd "$SCRIPT_DIR"
 VENV_DIR="$SCRIPT_DIR/analyzer_env"
 
 echo "🐍 Ensuring Python virtual environment..."
+# If currently inside another venv, deactivate to avoid confusion
+if [ -n "${VIRTUAL_ENV:-}" ]; then
+    deactivate 2>/dev/null || true
+fi
 if [ ! -d "$VENV_DIR" ]; then
     echo "Creating virtual environment at $VENV_DIR"
-    python3 -m venv "$VENV_DIR" || { echo "Failed to create venv. Ensure python3-venv is installed."; read -p "Press Enter to exit..."; exit 1; }
+    # Ensure venv module is available; try to install if not
+    if ! python3 - <<'PY'
+import sys
+import importlib
+sys.exit(0 if importlib.util.find_spec('venv') else 1)
+PY
+    then
+        echo "python3 venv module missing. Attempting to install python3-venv (sudo required)."
+        if command -v sudo >/dev/null 2>&1; then
+            sudo apt update || true
+            sudo apt install -y python3-venv || true
+        fi
+    fi
+    python3 -m ensurepip --upgrade >/dev/null 2>&1 || true
+    python3 -m venv "$VENV_DIR" || { echo "Failed to create venv at $VENV_DIR."; echo "Install with: sudo apt install -y python3-venv"; read -p "Press Enter to exit..."; exit 1; }
 fi
 
+[ -f "$VENV_DIR/bin/activate" ] || { echo "Venv activation script missing at $VENV_DIR/bin/activate"; read -p "Press Enter to exit..."; exit 1; }
 source "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
 
