@@ -189,11 +189,45 @@ class ModernAntennaAnalyzer:
             return
         
         print("🔍 Testing ADC readings...")
+        mag_readings = []
+        phase_readings = []
+        
         for i in range(5):
             mag_voltage = self.read_adc(0)
             phase_voltage = self.read_adc(1)
+            mag_readings.append(mag_voltage)
+            phase_readings.append(phase_voltage)
             print(f"Sample {i+1}: Magnitude={mag_voltage:.3f}V, Phase={phase_voltage:.3f}V")
             time.sleep(0.1)
+        
+        # Calculate and display statistics
+        if mag_readings:
+            mag_avg = sum(mag_readings) / len(mag_readings)
+            phase_avg = sum(phase_readings) / len(phase_readings)
+            print(f"📊 Average readings: Magnitude={mag_avg:.3f}V, Phase={phase_avg:.3f}V")
+            
+            # Show what SWR this would produce
+            if mag_avg <= 0.1:
+                swr = 1.0
+            elif mag_avg <= 1.0:
+                swr = 1.0 + ((mag_avg - 0.1) / 0.9) * 1.0
+            elif mag_avg <= 2.0:
+                swr = 2.0 + ((mag_avg - 1.0) / 1.0) * 3.0
+            elif mag_avg <= 3.0:
+                swr = 5.0 + ((mag_avg - 2.0) / 1.0) * 5.0
+            else:
+                excess_voltage = mag_avg - 3.0
+                swr = 10.0 + excess_voltage * 5.0
+            
+            swr = max(1.0, min(swr, 50.0))
+            print(f"📈 Calculated SWR: {swr:.2f}")
+            
+            if mag_avg < 0.5:
+                print("⚠️  WARNING: Very low magnitude voltage detected!")
+                print("   This may indicate:")
+                print("   - No antenna connected")
+                print("   - Antenna analyzer circuit not built")
+                print("   - ADC not receiving magnitude signal")
         
         print("✅ ADC test completed")
 
@@ -207,17 +241,25 @@ class ModernAntennaAnalyzer:
         phase_voltage = self.read_adc(1)
 
         # Calculate SWR from real ADC measurements
-        # Adjust formula for your hardware's voltage range (1.0-1.1V)
-        # Map voltage to SWR: 1.0V = SWR 1.0, 1.1V = SWR 3.0
-        if mag_voltage <= 1.0:
-            swr = 1.0  # Perfect match
-        elif mag_voltage <= 1.1:
-            # Linear interpolation between 1.0V (SWR=1.0) and 1.1V (SWR=3.0)
-            swr = 1.0 + ((mag_voltage - 1.0) / 0.1) * 2.0
+        # Improved formula that handles actual voltage ranges from ADS1115
+        # Map voltage to SWR with better scaling for real-world measurements
+        
+        if mag_voltage <= 0.1:
+            # Very low voltage = perfect match (or no signal)
+            swr = 1.0
+        elif mag_voltage <= 1.0:
+            # Low voltage range: 0.1V = SWR 1.0, 1.0V = SWR 2.0
+            swr = 1.0 + ((mag_voltage - 0.1) / 0.9) * 1.0
+        elif mag_voltage <= 2.0:
+            # Medium voltage range: 1.0V = SWR 2.0, 2.0V = SWR 5.0
+            swr = 2.0 + ((mag_voltage - 1.0) / 1.0) * 3.0
+        elif mag_voltage <= 3.0:
+            # High voltage range: 2.0V = SWR 5.0, 3.0V = SWR 10.0
+            swr = 5.0 + ((mag_voltage - 2.0) / 1.0) * 5.0
         else:
-            # For higher voltages, use exponential curve
-            excess_voltage = mag_voltage - 1.1
-            swr = 3.0 + excess_voltage * 10.0
+            # Very high voltage = extreme mismatch
+            excess_voltage = mag_voltage - 3.0
+            swr = 10.0 + excess_voltage * 5.0
         
         # Clamp SWR to reasonable range
         swr = max(1.0, min(swr, 50.0))
@@ -352,6 +394,7 @@ class ModernAntennaGUI:
         self.analyzer = ModernAntennaAnalyzer()
         self.measurements = []
         self._compact_buttons = []
+        self.debug_mode = False  # Debug mode flag
 
         self.setup_modern_gui()
 
@@ -550,13 +593,15 @@ class ModernAntennaGUI:
         b4 = self.create_modern_button(button_frame, "◀ Previous", self.previous_page, "primary")
         b5 = self.create_modern_button(button_frame, "Next ▶", self.next_page, "primary")
         b6 = self.create_modern_button(button_frame, "View", self.view_detailed_results, "success")
+        b7 = self.create_modern_button(button_frame, "Debug", self.toggle_debug_mode, "secondary")
         b1.pack(side='left', padx=(0, 3))
         b2.pack(side='left', padx=(0, 3))
         b3.pack(side='left', padx=(0, 3))
         b4.pack(side='left', padx=(0, 3))
         b5.pack(side='left', padx=(0, 3))
         b6.pack(side='left', padx=(0, 3))
-        self._compact_buttons += [b1, b2, b3, b4, b5, b6]
+        b7.pack(side='left', padx=(0, 3))
+        self._compact_buttons += [b1, b2, b3, b4, b5, b6, b7]
         
         # Store references to navigation buttons
         self.prev_button = b4
@@ -583,6 +628,14 @@ class ModernAntennaGUI:
                                 bg=self.current_theme['bg_primary'],
                                 fg=self.current_theme['text_secondary'])
         status_label.pack(anchor='w', pady=(3, 0))
+        
+        # Debug status
+        self.debug_status_var = tk.StringVar(value="Debug: OFF")
+        debug_status_label = tk.Label(sweep_row, textvariable=self.debug_status_var,
+                                     font=('Segoe UI', 7),
+                                     bg=self.current_theme['bg_primary'],
+                                     fg=self.current_theme['text_muted'])
+        debug_status_label.pack(anchor='w')
 
     def setup_control_panel(self, parent):
         """Setup modern control panel optimized for small screen"""
@@ -863,8 +916,35 @@ class ModernAntennaGUI:
             self.progress_canvas.create_rectangle(0, 0, progress_width, 6,
                                                   fill=self.current_theme['accent'],
                                                   outline="")
-        self.status_var.set(f"Measuring point {current}/{total}")
+        
+        # Show debug info if enabled
+        if self.debug_mode and hasattr(self, 'last_measurement') and self.last_measurement:
+            mag_v = self.last_measurement.get('mag_voltage', 0)
+            phase_v = self.last_measurement.get('phase_voltage', 0)
+            swr = self.last_measurement.get('swr', 0)
+            freq_mhz = self.last_measurement.get('frequency', 0) / 1e6
+            self.status_var.set(f"Point {current}/{total}: {freq_mhz:.1f}MHz, Mag={mag_v:.3f}V, SWR={swr:.2f}")
+        else:
+            self.status_var.set(f"Measuring point {current}/{total}")
+        
         self.root.update_idletasks()
+
+    def update_progress_with_debug(self, current, total):
+        """Update progress with debug information"""
+        # Get the last measurement for debug display
+        if hasattr(self, 'measurements') and self.measurements:
+            self.last_measurement = self.measurements[-1]
+        self.update_progress(current, total)
+
+    def toggle_debug_mode(self):
+        """Toggle debug mode on/off"""
+        self.debug_mode = not self.debug_mode
+        if self.debug_mode:
+            self.debug_status_var.set("Debug: ON - Showing voltage readings")
+            print("🔧 Debug mode enabled - voltage readings will be shown during sweeps")
+        else:
+            self.debug_status_var.set("Debug: OFF")
+            print("🔧 Debug mode disabled")
 
     def one_click_sweep(self):
         """Perform complete sweep with modern UI feedback"""
@@ -889,7 +969,7 @@ class ModernAntennaGUI:
 
             start_time = time.time()
             self.measurements = self.analyzer.frequency_sweep(
-                start_freq, stop_freq, points, self.update_progress
+                start_freq, stop_freq, points, self.update_progress_with_debug
             )
             sweep_time = time.time() - start_time
 
