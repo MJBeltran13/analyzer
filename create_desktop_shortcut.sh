@@ -7,7 +7,13 @@ echo "======================================================"
 
 # Get the current directory
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DESKTOP_DIR="$HOME/Desktop"
+# Resolve the Desktop directory using xdg-user-dir if available (handles localized desktops)
+if command -v xdg-user-dir >/dev/null 2>&1; then
+    DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
+else
+    DESKTOP_DIR="$HOME/Desktop"
+fi
+mkdir -p "$DESKTOP_DIR"
 SHORTCUT_NAME="Antenna Analyzer.desktop"
 
 # Create launcher script
@@ -15,53 +21,62 @@ echo "📝 Creating launcher script..."
 cat > "$CURRENT_DIR/launch_analyzer.sh" << 'EOF'
 #!/bin/bash
 # Launcher script for Modern Antenna Analyzer
+set -euo pipefail
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Change to the analyzer directory
 cd "$SCRIPT_DIR"
 
-# Check if virtual environment exists
-if [ -d "analyzer_env" ]; then
-    echo "🐍 Activating virtual environment..."
-    source analyzer_env/bin/activate
-else
-    echo "⚠️  Virtual environment not found. Using system Python..."
-    echo "   Consider running setup_raspberry_pi.sh first"
+VENV_DIR="$SCRIPT_DIR/analyzer_env"
+
+echo "🐍 Ensuring Python virtual environment..."
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating virtual environment at $VENV_DIR"
+    python3 -m venv "$VENV_DIR" || { echo "Failed to create venv. Ensure python3-venv is installed."; read -p "Press Enter to exit..."; exit 1; }
 fi
 
-# Check if analyzer.py exists
-if [ ! -f "analyzer.py" ]; then
+source "$VENV_DIR/bin/activate"
+python -m pip install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
+
+echo "🔍 Checking Python dependencies..."
+python - <<'PY' || DEP_ERR=$?
+import importlib
+modules = [
+    ("board", "adafruit-blinka"),
+    ("adafruit_ads1x15", "adafruit-circuitpython-ads1x15"),
+    ("smbus2", "smbus2"),
+    ("numpy", "numpy"),
+    ("matplotlib", "matplotlib"),
+]
+missing = []
+for mod, pkg in modules:
+    try:
+        importlib.import_module(mod)
+    except Exception:
+        missing.append(pkg)
+if missing:
+    print("Installing:", missing)
+    import subprocess, sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", *missing])
+PY
+if [ "${DEP_ERR:-0}" -ne 0 ]; then
+    echo "⚠️  Dependency check failed. Attempting installation from requirements files if available..."
+    if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+        pip install -r "$SCRIPT_DIR/requirements.txt" || true
+    fi
+    if [ -f "$SCRIPT_DIR/requirements_rpi.txt" ]; then
+        pip install -r "$SCRIPT_DIR/requirements_rpi.txt" || true
+    fi
+fi
+
+if [ ! -f "$SCRIPT_DIR/analyzer.py" ]; then
     echo "❌ Error: analyzer.py not found in $SCRIPT_DIR"
     read -p "Press Enter to exit..."
     exit 1
 fi
 
-# Check Python dependencies
-echo "🔍 Checking Python dependencies..."
-python3 -c "import RPi.GPIO, board, busio, adafruit_ads1x15, numpy, matplotlib, tkinter" 2>/dev/null
-if [ $? -ne 0 ]; then
-    echo "⚠️  Some dependencies are missing. Installing..."
-    if [ -f "requirements_rpi.txt" ]; then
-        pip3 install -r requirements_rpi.txt
-    else
-        echo "❌ requirements_rpi.txt not found"
-        read -p "Press Enter to exit..."
-        exit 1
-    fi
-fi
-
-# Run the analyzer
 echo "🚀 Starting Modern Antenna Analyzer..."
-python3 analyzer.py
-
-# Keep terminal open if there's an error
-if [ $? -ne 0 ]; then
-    echo ""
-    echo "❌ Application exited with an error"
-    read -p "Press Enter to exit..."
-fi
+exec python "$SCRIPT_DIR/analyzer.py"
 EOF
 
 # Make launcher script executable
@@ -76,6 +91,7 @@ Type=Application
 Name=Antenna Analyzer
 Comment=Modern Antenna Analyzer with ADS1115
 Exec=$CURRENT_DIR/launch_analyzer.sh
+Path=$CURRENT_DIR
 Icon=applications-electronics
 Terminal=true
 StartupNotify=true
@@ -95,7 +111,7 @@ echo "   • Double-click the 'Antenna Analyzer' icon on your desktop"
 echo "   • Or run: $CURRENT_DIR/launch_analyzer.sh"
 echo ""
 echo "📋 Notes:"
-echo "   • The shortcut will automatically activate the virtual environment if it exists"
-echo "   • If dependencies are missing, it will try to install them"
+echo "   • The launcher now creates/uses a local virtual environment automatically"
+echo "   • Dependencies install inside the venv to avoid PEP 668 issues"
 echo "   • The terminal will stay open to show any error messages"
 echo ""
