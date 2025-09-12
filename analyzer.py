@@ -206,18 +206,20 @@ class ModernAntennaAnalyzer:
             phase_avg = sum(phase_readings) / len(phase_readings)
             print(f"📊 Average readings: Magnitude={mag_avg:.3f}V, Phase={phase_avg:.3f}V")
             
-            # Show what SWR this would produce
+            # Show what SWR this would produce (using fixed calculation)
             if mag_avg <= 0.1:
                 swr = 1.0
-            elif mag_avg <= 1.0:
-                swr = 1.0 + ((mag_avg - 0.1) / 0.9) * 1.0
+            elif mag_avg <= 0.5:
+                swr = 1.0 + ((mag_avg - 0.1) / 0.4) * 0.5
+            elif mag_avg <= 0.8:
+                swr = 1.5 + ((mag_avg - 0.5) / 0.3) * 0.5
+            elif mag_avg <= 1.2:
+                swr = 2.0 + ((mag_avg - 0.8) / 0.4) * 1.0
             elif mag_avg <= 2.0:
-                swr = 2.0 + ((mag_avg - 1.0) / 1.0) * 3.0
-            elif mag_avg <= 3.0:
-                swr = 5.0 + ((mag_avg - 2.0) / 1.0) * 5.0
+                swr = 3.0 + ((mag_avg - 1.2) / 0.8) * 2.0
             else:
-                excess_voltage = mag_avg - 3.0
-                swr = 10.0 + excess_voltage * 5.0
+                excess_voltage = mag_avg - 2.0
+                swr = 5.0 + excess_voltage * 5.0
             
             swr = max(1.0, min(swr, 50.0))
             print(f"📈 Calculated SWR: {swr:.2f}")
@@ -241,25 +243,28 @@ class ModernAntennaAnalyzer:
         phase_voltage = self.read_adc(1)
 
         # Calculate SWR from real ADC measurements
-        # Improved formula that handles actual voltage ranges from ADS1115
-        # Map voltage to SWR with better scaling for real-world measurements
+        # Fixed formula that handles actual voltage ranges from ADS1115
+        # Based on debug analysis: actual voltages are 0.7V range, not 1.0V+
         
         if mag_voltage <= 0.1:
             # Very low voltage = perfect match (or no signal)
             swr = 1.0
-        elif mag_voltage <= 1.0:
-            # Low voltage range: 0.1V = SWR 1.0, 1.0V = SWR 2.0
-            swr = 1.0 + ((mag_voltage - 0.1) / 0.9) * 1.0
+        elif mag_voltage <= 0.5:
+            # Low voltage range: 0.1V = SWR 1.0, 0.5V = SWR 1.5
+            swr = 1.0 + ((mag_voltage - 0.1) / 0.4) * 0.5
+        elif mag_voltage <= 0.8:
+            # Medium voltage range: 0.5V = SWR 1.5, 0.8V = SWR 2.0
+            swr = 1.5 + ((mag_voltage - 0.5) / 0.3) * 0.5
+        elif mag_voltage <= 1.2:
+            # Higher voltage range: 0.8V = SWR 2.0, 1.2V = SWR 3.0
+            swr = 2.0 + ((mag_voltage - 0.8) / 0.4) * 1.0
         elif mag_voltage <= 2.0:
-            # Medium voltage range: 1.0V = SWR 2.0, 2.0V = SWR 5.0
-            swr = 2.0 + ((mag_voltage - 1.0) / 1.0) * 3.0
-        elif mag_voltage <= 3.0:
-            # High voltage range: 2.0V = SWR 5.0, 3.0V = SWR 10.0
-            swr = 5.0 + ((mag_voltage - 2.0) / 1.0) * 5.0
+            # High voltage range: 1.2V = SWR 3.0, 2.0V = SWR 5.0
+            swr = 3.0 + ((mag_voltage - 1.2) / 0.8) * 2.0
         else:
             # Very high voltage = extreme mismatch
-            excess_voltage = mag_voltage - 3.0
-            swr = 10.0 + excess_voltage * 5.0
+            excess_voltage = mag_voltage - 2.0
+            swr = 5.0 + excess_voltage * 5.0
         
         # Clamp SWR to reasonable range
         swr = max(1.0, min(swr, 50.0))
