@@ -27,7 +27,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-VENV_DIR="$SCRIPT_DIR/analyzer_env"
+# Prefer existing local .venv; fallback to analyzer_env
+if [ -d "$SCRIPT_DIR/.venv" ]; then
+    VENV_DIR="$SCRIPT_DIR/.venv"
+else
+    VENV_DIR="$SCRIPT_DIR/analyzer_env"
+fi
 
 echo "🐍 Ensuring Python virtual environment..."
 # If currently inside another venv, deactivate to avoid confusion
