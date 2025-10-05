@@ -1083,7 +1083,7 @@ class ModernAntennaGUI:
         # Build labels
         labels = []
         if no_antenna or score > 88:
-            labels.append("no antenna connected")
+            labels.append("")
         if not no_antenna:
             if score >= 85:
                 labels.append("Excellent")
