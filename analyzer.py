@@ -1,121 +1,144 @@
 #!/usr/bin/env python3
-"""
-Modern Antenna Analyzer - shadcn-inspired Design
-Beautiful, modern UI for antenna testing with dark/light themes
-"""
+
 
 # Import real hardware libraries
-import RPi.GPIO as GPIO
-import board
-import busio
-import adafruit_ads1x15.ads1115 as ADS
-from adafruit_ads1x15.analog_in import AnalogIn
+# These are like toolboxes that help the program talk to electronic components
+import RPi.GPIO as GPIO          # Controls the GPIO pins on Raspberry Pi (like digital switches)
+import board                     # Helps identify which pins are which on the Raspberry Pi
+import busio                     # Handles communication over I2C (a way for devices to talk)
+import adafruit_ads1x15.ads1115 as ADS  # Controls the ADS1115 chip (measures voltage precisely)
+from adafruit_ads1x15.analog_in import AnalogIn  # Reads analog signals (like measuring battery voltage)
 
-import time
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
-import tkinter as tk
-from tkinter import ttk, messagebox
-from datetime import datetime
-import json
-import os
+# Import software libraries for interface and calculations
+import time                      # For delays and timing
+import numpy as np              # For math calculations (like averages and statistics)
+import matplotlib.pyplot as plt # For creating graphs and charts
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # Connects graphs to the window
+from matplotlib.figure import Figure    # Creates the graph area
+import tkinter as tk            # Creates windows, buttons, and other GUI elements
+from tkinter import ttk, messagebox      # Advanced GUI elements and pop-up messages
+from datetime import datetime   # Gets current date and time
+import json                     # Saves data in a format other programs can read
+import os                       # Helps work with files and folders
 
 
 # Modern color scheme (shadcn-inspired)
+# This defines the colors used in the dark and light themes
+
 class ModernTheme:
-    # Dark theme colors
+    # Dark theme colors (for nighttime use or dark rooms)
     DARK = {
-        'bg_primary': '#09090b',
-        'bg_secondary': '#18181b',
-        'bg_muted': '#27272a',
-        'bg_card': '#0c0c0f',
-        'border': '#3f3f46',
-        'text_primary': '#fafafa',
-        'text_secondary': '#a1a1aa',
-        'text_muted': '#71717a',
-        'accent': '#3b82f6',
-        'accent_hover': '#2563eb',
-        'success': '#22c55e',
-        'warning': '#f59e0b',
-        'error': '#ef4444',
-        'gradient_start': '#3b82f6',
-        'gradient_end': '#8b5cf6'
+        'bg_primary': '#09090b',      # Main background (almost black)
+        'bg_secondary': '#18181b',    # Secondary background (dark gray)
+        'bg_muted': '#27272a',        # Muted background (medium gray)
+        'bg_card': '#0c0c0f',         # Card background (very dark)
+        'border': '#3f3f46',          # Border lines (medium gray)
+        'text_primary': '#fafafa',    # Main text (almost white)
+        'text_secondary': '#a1a1aa',  # Secondary text (light gray)
+        'text_muted': '#71717a',      # Muted text (medium gray)
+        'accent': '#3b82f6',          # Accent color (blue)
+        'accent_hover': '#2563eb',    # Accent when hovering (darker blue)
+        'success': '#22c55e',         # Success messages (green)
+        'warning': '#f59e0b',         # Warnings (orange)
+        'error': '#ef4444',           # Errors (red)
+        'gradient_start': '#3b82f6',  # Gradient start (blue)
+        'gradient_end': '#8b5cf6'     # Gradient end (purple)
     }
-    # Light theme colors
+    # Light theme colors (for daytime use or bright rooms)
     LIGHT = {
-        'bg_primary': '#ffffff',
-        'bg_secondary': '#f8fafc',
-        'bg_muted': '#f1f5f9',
-        'bg_card': '#ffffff',
-        'border': '#e2e8f0',
-        'text_primary': '#0f172a',
-        'text_secondary': '#475569',
-        'text_muted': '#64748b',
-        'accent': '#3b82f6',
-        'accent_hover': '#2563eb',
-        'success': '#22c55e',
-        'warning': '#f59e0b',
-        'error': '#ef4444',
-        'gradient_start': '#3b82f6',
-        'gradient_end': '#8b5cf6'
+        'bg_primary': '#ffffff',      # Main background (white)
+        'bg_secondary': '#f8fafc',    # Secondary background (very light gray)
+        'bg_muted': '#f1f5f9',        # Muted background (light gray)
+        'bg_card': '#ffffff',         # Card background (white)
+        'border': '#e2e8f0',          # Border lines (light gray)
+        'text_primary': '#0f172a',    # Main text (almost black)
+        'text_secondary': '#475569',  # Secondary text (dark gray)
+        'text_muted': '#64748b',      # Muted text (medium gray)
+        'accent': '#3b82f6',          # Accent color (blue)
+        'accent_hover': '#2563eb',    # Accent when hovering (darker blue)
+        'success': '#22c55e',         # Success messages (green)
+        'warning': '#f59e0b',         # Warnings (orange)
+        'error': '#ef4444',           # Errors (red)
+        'gradient_start': '#3b82f6',  # Gradient start (blue)
+        'gradient_end': '#8b5cf6'     # Gradient end (purple)
     }
 
+
+# Main hardware control class - this manages all the electronic components
 
 class ModernAntennaAnalyzer:
     def __init__(self):
-        # Hardware configuration (same as before)
-        self.W_CLK = 12  # violet white is gnd
-        self.FQ_UD = 16  # white
-        self.DATA = 20   # blue
-        self.RESET = 21  # green
-        self.ref_voltage = 3.3
-        self.adc_resolution = 65536  # 16-bit ADS1115
-        self.ads = None
-        self.chan0 = None  # Magnitude channel
-        self.chan1 = None  # Phase channel
-        self.hardware_ready = False
+        # Hardware configuration (wiring pin numbers)
+        # These are the physical connections on the Raspberry Pi
+   
+        self.W_CLK = 12   # Clock signal wire (violet wire, white is ground)
+        self.FQ_UD = 16   # Frequency update wire (white wire)
+        self.DATA = 20    # Data signal wire (blue wire)
+        self.RESET = 21   # Reset signal wire (green wire)
+
+        # Measurement settings
+        self.ref_voltage = 3.3           # Reference voltage (3.3 volts, standard for Raspberry Pi)
+        self.adc_resolution = 65536      # How precisely we can measure (16-bit = 65,536 levels)
+
+        # Hardware components (initially empty, will be set up in setup_hardware)
+        self.ads = None                  # The ADS1115 measurement chip
+        self.chan0 = None                # Channel for measuring signal strength
+        self.chan1 = None                # Channel for measuring signal timing
+        self.hardware_ready = False      # Flag to track if hardware is working
+
+        # Initialize the hardware components
         self.setup_hardware()
 
     def setup_hardware(self):
-        """Initialize GPIO and I2C ADC"""
+        """
+        Initialize GPIO and I2C ADC
+
+        """
         try:
             # Initialize ADS1115 I2C ADC FIRST (before GPIO to avoid conflicts)
+    
             print("🔌 Initializing ADS1115 I2C ADC...")
+            # Create I2C communication channel (like a phone line for devices)
             i2c = busio.I2C(board.SCL, board.SDA)
-            
-            # Scan for I2C devices
+
+            # Scan for I2C devices (look for connected measurement chips)
             print("🔍 Scanning I2C bus...")
             i2c_devices = []
             for device in i2c.scan():
                 i2c_devices.append(hex(device))
             print(f"Found I2C devices: {i2c_devices}")
-            
+
+            # Create the ADS1115 measurement device
             self.ads = ADS.ADS1115(i2c)
-            
+
             # Configure ADS1115 for optimal performance
-            self.ads.gain = 1  # ±4.096V range for better resolution
-            self.ads.data_rate = 860  # 860 samples per second for good speed/accuracy balance
-            
-            self.chan0 = AnalogIn(self.ads, ADS.P0)  # Magnitude
-            self.chan1 = AnalogIn(self.ads, ADS.P1)  # Phase
-            
+     
+            self.ads.gain = 1        # ±4.096V range for better resolution
+            self.ads.data_rate = 860 # 860 samples per second for good speed/accuracy balance
+
+            # Set up measurement channels
+            self.chan0 = AnalogIn(self.ads, ADS.P0)  # Magnitude (signal strength)
+            self.chan1 = AnalogIn(self.ads, ADS.P1)  # Phase (signal timing)
+
             print(f"✅ ADS1115 configured: Gain={self.ads.gain}, Data Rate={self.ads.data_rate} SPS")
-            
+
             # Mark hardware ready before running self-test to avoid false warning
             self.hardware_ready = True
 
-            # Test ADC readings
+            # Test ADC readings (make sure the measurement chip is working)
             self.test_adc_readings()
 
             # Initialize GPIO AFTER I2C (to avoid conflicts)
+        
             print("🔌 Initializing GPIO for AD9850...")
-            GPIO.setmode(GPIO.BCM)
+            GPIO.setmode(GPIO.BCM)  # Use the pin numbering system
+            # Set up the control wires as outputs (like setting switches)
             GPIO.setup([self.W_CLK, self.FQ_UD, self.DATA, self.RESET], GPIO.OUT)
+            # Set initial states (like turning switches off/on)
             GPIO.output([self.W_CLK, self.FQ_UD, self.DATA], GPIO.LOW)
             GPIO.output(self.RESET, GPIO.HIGH)
 
+            # Reset the signal generator chip
             self.reset_dds()
             print("✅ Real hardware initialized (ADS1115 I2C ADC + AD9850 DDS)")
         except Exception as e:
@@ -124,115 +147,138 @@ class ModernAntennaAnalyzer:
             self.hardware_ready = False
 
     def reset_dds(self):
-        GPIO.output(self.RESET, GPIO.HIGH)
-        time.sleep(0.001)
-        GPIO.output(self.RESET, GPIO.LOW)
-        time.sleep(0.001)
-        GPIO.output(self.RESET, GPIO.HIGH)
+        """
+        Reset the AD9850 signal generator chip
+     
+
+        """
+        GPIO.output(self.RESET, GPIO.HIGH)  # Turn reset ON
+        time.sleep(0.001)                   # Wait 1 millisecond
+        GPIO.output(self.RESET, GPIO.LOW)   # Turn reset OFF
+        time.sleep(0.001)                   # Wait another millisecond
+        GPIO.output(self.RESET, GPIO.HIGH)  # Turn reset back ON (ready state)
 
     def set_frequency(self, freq_hz):
-        """Program AD9850 via 3-wire serial: 32-bit FTW + 8-bit control, LSB-first.
+        """
+        Program AD9850 via 3-wire serial: 32-bit FTW + 8-bit control, LSB-first.
         Uses 125 MHz reference clock (no PLL) as in provided Arduino example.
+
+     
+        It's like tuning a radio to a specific station, but we're creating the signal instead of receiving it.
         """
         if not self.hardware_ready:
             return False
 
-        # AD9850 reference clock
+        # AD9850 reference clock (the chip has a built-in 125 MHz oscillator)
         system_clock_hz = 125_000_000.0
+
+        # Calculate the tuning word (like a secret code that tells the chip what frequency to generate)
+        # This math converts the desired frequency into the special number the chip understands
         ftw = int((freq_hz * 4294967296.0) / system_clock_hz) & 0xFFFFFFFF
 
-        # AD9850 control byte (0x00 for default operation)
+        # AD9850 control byte (tells the chip how to behave - 0x00 means normal operation)
         control_byte = 0x00
 
-        # Load 32-bit FTW, LSB-first
+        # Send the 32-bit tuning word to the chip, one bit at a time (LSB-first)
+
         for bit_index in range(32):
-            bit = (ftw >> bit_index) & 0x1
-            GPIO.output(self.DATA, GPIO.HIGH if bit else GPIO.LOW)
-            GPIO.output(self.W_CLK, GPIO.HIGH)
+            bit = (ftw >> bit_index) & 0x1  # Extract each bit
+            GPIO.output(self.DATA, GPIO.HIGH if bit else GPIO.LOW)  # Set the data wire
+            GPIO.output(self.W_CLK, GPIO.HIGH)  # Pulse the clock wire (like a heartbeat)
             GPIO.output(self.W_CLK, GPIO.LOW)
 
-        # Load 8-bit control byte, LSB-first
+        # Send the 8-bit control byte, one bit at a time
         for bit_index in range(8):
             bit = (control_byte >> bit_index) & 0x1
             GPIO.output(self.DATA, GPIO.HIGH if bit else GPIO.LOW)
             GPIO.output(self.W_CLK, GPIO.HIGH)
             GPIO.output(self.W_CLK, GPIO.LOW)
 
-        # Latch the 40-bit word
+        # Tell the chip we're done sending data (latch the word)
         GPIO.output(self.FQ_UD, GPIO.HIGH)
         GPIO.output(self.FQ_UD, GPIO.LOW)
         return True
 
     def read_adc(self, channel):
+        """
+        Read voltage from ADC channel
+ 
+        """
         if not self.hardware_ready:
             return 0
         try:
-            # Read from ADS1115
+            # Read from ADS1115 measurement chip
             if channel == 0:
-                voltage = self.chan0.voltage
-                raw_value = self.chan0.value
+                voltage = self.chan0.voltage  # Get voltage from magnitude channel
+                raw_value = self.chan0.value  # Get raw digital value
                 return voltage
             elif channel == 1:
-                voltage = self.chan1.voltage
-                raw_value = self.chan1.value
+                voltage = self.chan1.voltage  # Get voltage from phase channel
+                raw_value = self.chan1.value  # Get raw digital value
                 return voltage
             else:
-                return 0
+                return 0  # Invalid channel
         except Exception as e:
             print(f"ADC read error on channel {channel}: {e}")
             return 0
 
     def test_adc_readings(self):
-        """Test ADC readings for troubleshooting"""
+        """
+        Test ADC readings for troubleshooting
+  
+        """
         if not self.hardware_ready:
             print("❌ Hardware not ready")
             return
-        
+
         print("🔍 Testing ADC readings...")
-        mag_readings = []
-        phase_readings = []
-        
+        mag_readings = []   # Store magnitude (signal strength) readings
+        phase_readings = [] # Store phase (signal timing) readings
+
+        # Take 5 sample readings to check consistency
         for i in range(5):
-            mag_voltage = self.read_adc(0)
-            phase_voltage = self.read_adc(1)
+            mag_voltage = self.read_adc(0)   # Read signal strength
+            phase_voltage = self.read_adc(1) # Read signal timing
             mag_readings.append(mag_voltage)
             phase_readings.append(phase_voltage)
             print(f"Sample {i+1}: Magnitude={mag_voltage:.3f}V, Phase={phase_voltage:.3f}V")
-            time.sleep(0.1)
-        
+            time.sleep(0.1)  # Wait 100ms between readings
+
         # Calculate and display statistics
         if mag_readings:
             mag_avg = sum(mag_readings) / len(mag_readings)
             phase_avg = sum(phase_readings) / len(phase_readings)
             print(f"📊 Average readings: Magnitude={mag_avg:.3f}V, Phase={phase_avg:.3f}V")
-            
+
             # Show what SWR this would produce (using calibrated calculation)
-            # Simulate antenna detection
+        
             antenna_connected = phase_avg < 1.35 or (phase_avg < 1.4 and mag_avg < 0.97)
-            
+
             if not antenna_connected:
-                swr = 8.0  # No antenna
+                swr = 8.0  # No antenna (very poor match)
             else:
-                # Use calibrated SWR calculation
+                # Use calibrated SWR calculation based on actual measurements
                 if mag_avg <= 0.95:
-                    swr = 1.0 + (0.95 - mag_avg) * 2.0
+                    swr = 1.0 + (0.95 - mag_avg) * 2.0  # Very good match
                 elif mag_avg <= 0.97:
-                    swr = 1.0 + (mag_avg - 0.95) * 5.0
+                    swr = 1.0 + (mag_avg - 0.95) * 5.0  # Good match
                 elif mag_avg <= 0.98:
-                    swr = 2.0 + (mag_avg - 0.97) * 10.0
+                    swr = 2.0 + (mag_avg - 0.97) * 10.0 # Fair match
                 else:
-                    swr = 3.0 + (mag_avg - 0.98) * 20.0
-                
-                # Adjust based on phase
+                    swr = 3.0 + (mag_avg - 0.98) * 20.0 # Poor match
+
+                # Fine-tune based on phase voltage
                 if phase_avg < 1.3:
-                    swr *= 0.8
+                    swr *= 0.8  # Very good phase
                 elif phase_avg > 1.4:
-                    swr *= 1.3
-            
+                    swr *= 1.3  # Poor phase
+
+            # Keep SWR in reasonable range
             swr = max(1.0, min(swr, 50.0))
             antenna_status = "WITH antenna" if antenna_connected else "WITHOUT antenna"
             print(f"📈 Calculated SWR: {swr:.2f} ({antenna_status})")
-            
+
+            # Show warnings if readings are unusual
             if mag_avg < 0.9:
                 print("⚠️  WARNING: Very low magnitude voltage detected!")
                 print("   This may indicate:")
@@ -245,7 +291,7 @@ class ModernAntennaAnalyzer:
                 print("   - Open circuit (no antenna)")
                 print("   - Poor antenna match")
                 print("   - Circuit calibration issue")
-        
+
         print("✅ ADC test completed")
 
 
@@ -254,21 +300,27 @@ class ModernAntennaAnalyzer:
         """
         Detect if an antenna is connected based on voltage patterns.
         Calibrated based on actual hardware measurements from 2025-09-12.
+
+ 
+        It's like checking if there's a load (resistance) on the end of the cable.
         """
         # If voltages are extremely low (near zero), definitely no antenna
         if mag_voltage < 0.1 and phase_voltage < 0.1:
             return False
-        
+
         # If voltages are extremely high (open circuit), no antenna
         if mag_voltage > 3.5 or phase_voltage > 3.5:
             return False
-        
+
         # Calibrated detection based on actual measurements:
         # WITH antenna: Mag=0.966V±0.004V, Phase=1.321V±0.059V
         # WITHOUT antenna: Mag=0.976V±0.003V, Phase=1.381V±0.046V
-        
+
+     
+        # when an antenna is connected vs when it's not connected
+
         # Use phase voltage as primary indicator (more variation)
-        # Antenna connected when phase voltage is lower (better match)
+        # Antenna connected when phase voltage is lower (better electrical match)
         if phase_voltage < 1.35:  # Below average of both conditions
             return True
         elif phase_voltage > 1.4:  # Above no-antenna average
@@ -278,27 +330,38 @@ class ModernAntennaAnalyzer:
             return mag_voltage < 0.97  # Slightly below no-antenna average
 
     def measure_point(self, freq_hz):
+        """
+        Measure SWR at a single frequency point
+ 
+        """
+        # Set the signal generator to the desired frequency
         if not self.set_frequency(freq_hz):
             return None
-        time.sleep(0.01)
-        mag_voltage = self.read_adc(0)
-        phase_voltage = self.read_adc(1)
 
-        # Detect if antenna is connected
+        time.sleep(0.01)  # Wait for signal to stabilize
+
+        # Read the voltage measurements
+        mag_voltage = self.read_adc(0)   # Signal strength
+        phase_voltage = self.read_adc(1) # Signal timing
+
+        # Detect if antenna is connected using voltage patterns
         antenna_connected = self.detect_antenna_connection(mag_voltage, phase_voltage)
-        
+
         # Calculate SWR from real ADC measurements
+    
+        # Lower SWR is better - 1.0 is perfect, 3.0 or higher means the antenna needs adjustment.
+
         # Calibrated based on actual hardware measurements from 2025-09-12
         # WITH antenna: Mag=0.966V±0.004V, Phase=1.321V±0.059V
         # WITHOUT antenna: Mag=0.976V±0.003V, Phase=1.381V±0.046V
-        
+
         if not antenna_connected:
             # No antenna detected - show very poor SWR
-            swr = 8.0  # Very poor match (open circuit)
+            swr = 8.0  # Very poor match (like an open circuit)
         else:
             # Calibrated SWR calculation based on actual voltage ranges
-            # Use both magnitude and phase for better accuracy
-            
+      
+
             # Base SWR from magnitude voltage (primary indicator)
             if mag_voltage <= 0.95:
                 # Very good match (below antenna average)
@@ -312,19 +375,20 @@ class ModernAntennaAnalyzer:
             else:
                 # Poor match (in no-antenna range)
                 swr = 3.0 + (mag_voltage - 0.98) * 20.0  # 0.98V = SWR 3.0, 0.99V = SWR 5.0
-            
+
             # Adjust based on phase voltage (secondary indicator)
-            # Lower phase voltage indicates better match
+            # Lower phase voltage indicates better electrical match
             if phase_voltage < 1.3:
-                # Very good phase - reduce SWR
+                # Very good phase - reduce SWR (better match)
                 swr *= 0.8
             elif phase_voltage > 1.4:
-                # Poor phase - increase SWR
+                # Poor phase - increase SWR (worse match)
                 swr *= 1.3
-        
-        # Clamp SWR to reasonable range
+
+        # Keep SWR in reasonable range (not too low or too high)
         swr = max(1.0, min(swr, 50.0))
 
+        # Return all the measurement data
         return {
             'frequency': freq_hz,
             'swr': swr,
@@ -334,19 +398,35 @@ class ModernAntennaAnalyzer:
         }
 
     def frequency_sweep(self, start_freq, stop_freq, points=100, progress_callback=None):
+        """
+        Perform a frequency sweep across a range
+ 
+        """
+        # Create an array of frequencies to test (evenly spaced)
         frequencies = np.linspace(start_freq, stop_freq, points)
-        measurements = []
+        measurements = []  # Store all measurement results
+
+        # Test each frequency one by one
         for i, freq in enumerate(frequencies):
-            measurement = self.measure_point(freq)
+            measurement = self.measure_point(freq)  # Test this frequency
             if measurement:
                 measurements.append(measurement)
+
+            # Update progress if callback provided (for progress bar)
             if progress_callback:
                 progress_callback(i + 1, points)
+
+            # Small delay every 10 measurements to prevent overwhelming the hardware
             if i % 10 == 0:
                 time.sleep(0.001)
+
         return measurements
 
     def rate_antenna_performance(self, measurements):
+        """
+        Rate antenna performance based on SWR measurements
+ 
+        """
         if not measurements:
             return {"rating": "F", "score": 0, "analysis": "No measurements available"}
 
@@ -440,47 +520,72 @@ class ModernAntennaAnalyzer:
         }
 
     def cleanup(self):
+        """
+        Clean up hardware connections
+      
+        """
         if self.hardware_ready:
-            GPIO.cleanup()
+            GPIO.cleanup()  # Release all GPIO pin connections
 
+
+# Main GUI (Graphical User Interface) class - handles all the windows, buttons, and displays
 
 class ModernAntennaGUI:
     def __init__(self, root):
-        self.root = root
+        """
+        Initialize the GUI application
+       
+        """
+        self.root = root  # The main window
+
+        # Configure the main window
         self.root.title("Modern Antenna Analyzer - ADS1115 Hardware")
-        self.root.geometry("800x480")   # Target screen
-        self.root.resizable(True, True)
-        self.root.minsize(640, 400)     # Allow smaller if needed
+        self.root.geometry("800x480")   # Initial window size (800 pixels wide, 480 tall)
+        self.root.resizable(True, True) # Allow user to resize
+        self.root.minsize(640, 400)     # Minimum size allowed
+
         try:
             # Slightly reduce Tk scaling for compactness on small screens
             self.root.tk.call('tk', 'scaling', 0.9)
         except Exception:
             pass
 
-        # Theme management
-        self.is_dark_mode = True
-        self.current_theme = ModernTheme.DARK
+        # Theme management (dark/light mode)
+        self.is_dark_mode = True        # Start in dark mode
+        self.current_theme = ModernTheme.DARK  # Use dark colors
 
-        # Configure root styling
+        # Set up the visual styling
         self.setup_modern_styling()
 
+        # Create the hardware analyzer object
         self.analyzer = ModernAntennaAnalyzer()
-        self.measurements = []
-        self._compact_buttons = []
-        self.debug_mode = False  # Debug mode flag
+        self.measurements = []         # Store measurement results
+        self._compact_buttons = []     # Track buttons for small screen adjustments
+        self.debug_mode = False        # Debug mode flag (shows extra technical info)
 
+        # Set up the complete GUI layout
         self.setup_modern_gui()
 
     # ---- Small-screen helpers ----
+
+
     def is_small_screen(self):
+        """
+        Check if we're on a small screen
+       
+        """
         try:
-            w = self.root.winfo_width()
-            h = self.root.winfo_height()
+            w = self.root.winfo_width()   # Get current window width
+            h = self.root.winfo_height()  # Get current window height
         except Exception:
-            w, h = 800, 480
-        return (w <= 820 and h <= 500)
+            w, h = 800, 480  # Default if we can't get the size
+        return (w <= 820 and h <= 500)   # Consider it small if 820x500 or smaller
 
     def apply_small_screen_scaling(self):
+        """
+        Adjust interface for small screens
+       
+        """
         # Adjust sweep button padding
         try:
             self.sweep_button.configure(pady=8, padx=16, text="SWEEP")
@@ -514,143 +619,208 @@ class ModernAntennaGUI:
 
     # ---- Styling & components ----
     def setup_modern_styling(self):
-        """Setup modern styling for the application"""
+        """
+        Setup modern styling for the application
+
+        """
+        # Set the main window background color
         self.root.configure(bg=self.current_theme['bg_primary'])
+
+        # Configure the ttk (themed tkinter) styles
         self.style = ttk.Style()
+
+        # Style for modern buttons
         self.style.configure('Modern.TButton',
-                             background=self.current_theme['accent'],
-                             foreground='white',
-                             borderwidth=0,
-                             focuscolor='none',
-                             font=('Segoe UI', 10, 'bold'))
+                             background=self.current_theme['accent'],    # Blue background
+                             foreground='white',                         # White text
+                             borderwidth=0,                              # No border
+                             focuscolor='none',                          # No focus ring
+                             font=('Segoe UI', 10, 'bold'))              # Bold font
+
+        # Button hover effect
         self.style.map('Modern.TButton',
-                       background=[('active', self.current_theme['accent_hover'])])
+                       background=[('active', self.current_theme['accent_hover'])])  # Darker blue when clicked
+
+        # Style for card-like frames (containers)
         self.style.configure('Card.TFrame',
-                             background=self.current_theme['bg_card'],
-                             borderwidth=1,
-                             relief='solid')
+                             background=self.current_theme['bg_card'],   # Card background
+                             borderwidth=1,                              # Border width
+                             relief='solid')                             # Solid border style
+
+        # Style for text entry fields
         self.style.configure('Modern.TEntry',
-                             borderwidth=1,
-                             relief='solid',
-                             fieldbackground=self.current_theme['bg_muted'],
-                             foreground=self.current_theme['text_primary'])
+                             borderwidth=1,                              # Border width
+                             relief='solid',                             # Solid border
+                             fieldbackground=self.current_theme['bg_muted'],  # Input field background
+                             foreground=self.current_theme['text_primary'])   # Text color
 
     def create_modern_card(self, parent, title="", padding=10):
-        """Create a modern card-style frame"""
+        """
+        Create a modern card-style frame (like a container/panel)
+       
+        """
         if self.is_small_screen():
-            padding = 6
+            padding = 6  # Use less padding on small screens
+
+        # Create the main card frame
         card = tk.Frame(parent, bg=self.current_theme['bg_card'], relief='solid', bd=1)
+
         if title:
+            # Create title section if provided
             title_frame = tk.Frame(card, bg=self.current_theme['bg_card'])
             title_frame.pack(fill='x', padx=padding, pady=(padding, 4))
+
+            # Create title label
             title_label = tk.Label(title_frame, text=title,
                                    font=('Segoe UI', 10, 'bold'),
                                    bg=self.current_theme['bg_card'],
                                    fg=self.current_theme['text_primary'])
-            title_label.pack(anchor='w')
+            title_label.pack(anchor='w')  # Left-align the title
+
+        # Create content area
         content_frame = tk.Frame(card, bg=self.current_theme['bg_card'])
         content_frame.pack(fill='both', expand=True, padx=padding, pady=(0, padding))
-        return card, content_frame
+
+        return card, content_frame  # Return both the card and its content area
 
     def create_modern_button(self, parent, text, command, style="primary", width=None):
-        """Create a modern styled button"""
+        """
+        Create a modern styled button
+
+        """
+        # Set colors based on button style
         if style == "primary":
-            bg_color = self.current_theme['accent']
-            fg_color = 'white'
-            hover_color = self.current_theme['accent_hover']
+            bg_color = self.current_theme['accent']      # Blue for main actions
+            fg_color = 'white'                          # White text
+            hover_color = self.current_theme['accent_hover']  # Darker blue on hover
         elif style == "success":
-            bg_color = self.current_theme['success']
-            fg_color = 'white'
-            hover_color = '#16a34a'
+            bg_color = self.current_theme['success']    # Green for positive actions
+            fg_color = 'white'                          # White text
+            hover_color = '#16a34a'                     # Darker green on hover
         elif style == "secondary":
-            bg_color = self.current_theme['bg_muted']
-            fg_color = self.current_theme['text_primary']
-            hover_color = self.current_theme['border']
+            bg_color = self.current_theme['bg_muted']   # Gray for secondary actions
+            fg_color = self.current_theme['text_primary']  # Dark text
+            hover_color = self.current_theme['border']  # Gray border on hover
         else:
+            # Default to primary style
             bg_color = self.current_theme['accent']
             fg_color = 'white'
             hover_color = self.current_theme['accent_hover']
 
+        # Create the button
         btn = tk.Button(parent, text=text, command=command,
                         bg=bg_color, fg=fg_color, border=0, relief='flat',
                         font=('Segoe UI', 10, 'bold'), cursor='hand2', pady=12, padx=24)
-        if width:
-            btn.configure(width=width)
 
-        def on_enter(e): btn.configure(bg=hover_color)
-        def on_leave(e): btn.configure(bg=bg_color)
+        if width:
+            btn.configure(width=width)  # Set custom width if provided
+
+        # Add hover effects (change color when mouse moves over button)
+        def on_enter(e): btn.configure(bg=hover_color)  # Mouse enters
+        def on_leave(e): btn.configure(bg=bg_color)     # Mouse leaves
         btn.bind("<Enter>", on_enter)
         btn.bind("<Leave>", on_leave)
+
         return btn
 
     def adjust_float(self, tk_variable, delta, min_value, max_value, decimals=1):
+        """
+        Adjust a floating-point number variable (used for +/- buttons)
+       
+        """
         try:
-            current_value = float(tk_variable.get())
-            new_value = current_value + float(delta)
+            current_value = float(tk_variable.get())    # Get current number
+            new_value = current_value + float(delta)    # Add the change
+            # Keep within allowed range
             new_value = max(min_value, min(max_value, new_value))
+            # Format to specified decimal places
             format_str = f"{new_value:.{decimals}f}"
-            tk_variable.set(format_str)
+            tk_variable.set(format_str)  # Update the display
         except Exception:
-            pass
+            pass  # Ignore errors (like if text isn't a number)
 
     def adjust_int(self, tk_variable, delta, min_value, max_value):
+        """
+        Adjust an integer variable (used for +/- buttons)
+
+        """
         try:
-            current_value = int(tk_variable.get())
-            new_value = current_value + int(delta)
+            current_value = int(tk_variable.get())    # Get current number
+            new_value = current_value + int(delta)    # Add the change
+            # Keep within allowed range
             new_value = max(min_value, min(max_value, new_value))
-            tk_variable.set(str(new_value))
+            tk_variable.set(str(new_value))  # Update the display
         except Exception:
-            pass
+            pass  # Ignore errors (like if text isn't a number)
 
 
 
     def setup_modern_gui(self):
-        """Setup the modern GUI interface with flexible sizing"""
+        """
+        Setup the modern GUI interface with flexible sizing
+       
+        """
+        # Create main container frame
         main_container = tk.Frame(self.root, bg=self.current_theme['bg_primary'])
         main_container.pack(fill='both', expand=True, padx=3, pady=3)
 
+        # Create the header (top section with buttons)
         self.create_header(main_container)
 
         # Content area (use grid for tight control on small screens)
         content_area = tk.Frame(main_container, bg=self.current_theme['bg_primary'])
         content_area.pack(fill='both', expand=True, pady=(3, 0))
-        content_area.grid_columnconfigure(0, weight=0, minsize=280)  # fixed left column
-        content_area.grid_columnconfigure(1, weight=1)               # flexible right column
-        content_area.grid_rowconfigure(0, weight=1)
 
+        # Configure grid layout
+        content_area.grid_columnconfigure(0, weight=0, minsize=280)  # Fixed width left column
+        content_area.grid_columnconfigure(1, weight=1)               # Flexible right column
+        content_area.grid_rowconfigure(0, weight=1)                  # Single row
+
+        # Create left and right panels
         left_panel = tk.Frame(content_area, bg=self.current_theme['bg_primary'], width=280)
         right_panel = tk.Frame(content_area, bg=self.current_theme['bg_primary'])
-        left_panel.grid(row=0, column=0, sticky='ns', padx=(0, 3))
-        right_panel.grid(row=0, column=1, sticky='nsew')
 
-        # Setup panels
-        self.setup_control_panel(left_panel)
-        self.setup_results_panel(left_panel)
-        self.setup_plot_panel(right_panel)
+        # Position panels in grid
+        left_panel.grid(row=0, column=0, sticky='ns', padx=(0, 3))   # Left side, stick to top/bottom
+        right_panel.grid(row=0, column=1, sticky='nsew')             # Right side, fill all space
 
-        # Navigation buttons that we may compact later
+        # Set up the three main panels
+        self.setup_control_panel(left_panel)    # Frequency settings, buttons
+        self.setup_results_panel(left_panel)    # Results display, rating
+        self.setup_plot_panel(right_panel)      # SWR graph
+
+        # Track buttons for potential compact mode
         self._compact_buttons = []
 
-        # Bind resize and apply initial compact scaling if needed
-        self.root.bind('<Configure>', self.on_window_resize)
+        # Handle window resizing and initial small screen setup
+        self.root.bind('<Configure>', self.on_window_resize)  # Call when window size changes
+        # Apply small screen adjustments after a short delay
         self.root.after(50, lambda: self.apply_small_screen_scaling() if self.is_small_screen() else None)
 
     def create_header(self, parent):
-        """Create modern header with buttons at the top"""
+        """
+        Create modern header with buttons at the top
+    
+        """
         header = tk.Frame(parent, bg=self.current_theme['bg_primary'])
         header.pack(fill='x', pady=(0, 2))
 
+        # Top row with title and buttons
         top_row = tk.Frame(header, bg=self.current_theme['bg_primary'])
         top_row.pack(fill='x', pady=(0, 2))
 
+        # Title section (left side)
         title_frame = tk.Frame(top_row, bg=self.current_theme['bg_primary'])
         title_frame.pack(side='left')
+
+        # Main title
         title_label = tk.Label(title_frame, text="Antenna Analyzer",
                                font=('Segoe UI', 14, 'bold'),
                                bg=self.current_theme['bg_primary'],
                                fg=self.current_theme['text_primary'])
         title_label.pack(anchor='w')
 
+        # Subtitle
         subtitle_text = "RF Testing Suite • ADS1115 Hardware"
         subtitle_label = tk.Label(title_frame, text=subtitle_text,
                                   font=('Segoe UI', 8),
@@ -658,8 +828,11 @@ class ModernAntennaGUI:
                                   fg=self.current_theme['text_secondary'])
         subtitle_label.pack(anchor='w')
 
+        # Button section (right side)
         button_frame = tk.Frame(top_row, bg=self.current_theme['bg_primary'])
         button_frame.pack(side='right')
+
+        # Create all the header buttons
         b1 = self.create_modern_button(button_frame, "Save", self.save_results, "secondary")
         b2 = self.create_modern_button(button_frame, "History", self.show_history, "secondary")
         b3 = self.create_modern_button(button_frame, "Clear", self.clear_results, "secondary")
@@ -667,6 +840,8 @@ class ModernAntennaGUI:
         b5 = self.create_modern_button(button_frame, "Next ▶", self.next_page, "primary")
         b6 = self.create_modern_button(button_frame, "View", self.view_detailed_results, "success")
         b7 = self.create_modern_button(button_frame, "Debug", self.toggle_debug_mode, "secondary")
+
+        # Pack buttons horizontally
         b1.pack(side='left', padx=(0, 3))
         b2.pack(side='left', padx=(0, 3))
         b3.pack(side='left', padx=(0, 3))
@@ -674,35 +849,44 @@ class ModernAntennaGUI:
         b5.pack(side='left', padx=(0, 3))
         b6.pack(side='left', padx=(0, 3))
         b7.pack(side='left', padx=(0, 3))
-        self._compact_buttons += [b1, b2, b3, b4, b5, b6, b7]
-        
-        # Store references to navigation buttons
-        self.prev_button = b4
-        self.next_button = b5
-        self.view_button = b6
 
+        # Track buttons for compact mode
+        self._compact_buttons += [b1, b2, b3, b4, b5, b6, b7]
+
+        # Store references to navigation buttons for easy access
+        self.prev_button = b4  # Previous page button
+        self.next_button = b5  # Next page button
+        self.view_button = b6  # View details button
+
+        # Second row for sweep button and progress
         sweep_row = tk.Frame(header, bg=self.current_theme['bg_primary'])
         sweep_row.pack(fill='x', pady=(0, 2))
+
+        # Main sweep button (center)
         self.sweep_button = self.create_modern_button(sweep_row, "SWEEP", self.one_click_sweep, "primary")
         self.sweep_button.pack(anchor='center')
 
-        self.progress_var = tk.DoubleVar()
+        # Progress bar setup
+        self.progress_var = tk.DoubleVar()  # Variable to track progress (0-100)
         progress_frame = tk.Frame(sweep_row, bg=self.current_theme['bg_primary'])
         progress_frame.pack(fill='x', pady=(3, 0))
+
+        # Create progress bar canvas
         progress_canvas = tk.Canvas(progress_frame, height=6,
                                     bg=self.current_theme['bg_muted'],
                                     highlightthickness=0, relief='flat')
         progress_canvas.pack(fill='x')
         self.progress_canvas = progress_canvas
 
+        # Status label (shows current operation)
         self.status_var = tk.StringVar(value="Ready to test - ADS1115 Hardware")
         status_label = tk.Label(sweep_row, textvariable=self.status_var,
                                 font=('Segoe UI', 8),
                                 bg=self.current_theme['bg_primary'],
                                 fg=self.current_theme['text_secondary'])
         status_label.pack(anchor='w', pady=(3, 0))
-        
-        # Debug status
+
+        # Debug status label (shows if debug mode is on)
         self.debug_status_var = tk.StringVar(value="Debug: OFF")
         debug_status_label = tk.Label(sweep_row, textvariable=self.debug_status_var,
                                      font=('Segoe UI', 7),
@@ -711,17 +895,21 @@ class ModernAntennaGUI:
         debug_status_label.pack(anchor='w')
 
     def setup_control_panel(self, parent):
-        """Setup modern control panel optimized for small screen"""
+        """
+        Setup modern control panel optimized for small screen
+    
+        """
         control_card, control_content = self.create_modern_card(parent, "Test Parameters")
         control_card.pack(fill='x', pady=(0, 3))
 
-        # Hardware status frame
+        # Hardware status indicator (shows which measurement hardware is connected)
         hw_frame = tk.Frame(control_content, bg=self.current_theme['bg_muted'], relief='solid', bd=1)
         hw_frame.pack(fill='x', pady=(0, 5))
-        hw_label = tk.Label(hw_frame, text="ADS1115 I2C ADC",
+
+        hw_label = tk.Label(hw_frame, text="ADS1115 I2C ADC",  # Shows the measurement chip being used
                                   font=('Segoe UI', 8, 'bold'),
                                   bg=self.current_theme['bg_muted'],
-                                  fg=self.current_theme['success'],
+                                  fg=self.current_theme['success'],  # Green text to show it's working
                                   pady=2)
         hw_label.pack()
 
@@ -1378,10 +1566,19 @@ class ModernAntennaGUI:
         except Exception as e:
             messagebox.showerror("Error", f"Quick test failed: {e}")
 
+# Main program entry point
+
 if __name__ == '__main__':
     try:
+        # Create the main window
         root = tk.Tk()
+
+        # Create the antenna analyzer application
         app = ModernAntennaGUI(root)
+
+        # Start the main event loop (keeps the window open and responsive)
         root.mainloop()
+
     except Exception as e:
         print(f"Failed to launch GUI: {e}")
+        # If something goes wrong during startup, show the error
